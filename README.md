@@ -41,8 +41,9 @@ process that merely took the port. Connections with an `Origin` header (browsers
 | --- | --- | --- |
 | Action | `run-command` | Any command id, with optional JSON arguments; dropdown lists the window's commands |
 | Action | `run-task` | Any task from the workspace (tasks.json, npm scripts, ...) |
-| Action | `select-window` | Pin or unpin the current window, switch to the next one, or pin a workspace; button shows pinned or following |
-| Variables | `vscode_connected`, `vscode_window_count`, `vscode_target_pinned`, `vscode_workspace`, `vscode_active_file`, `vscode_language`, `vscode_git_branch`, `vscode_errors`, `vscode_warnings`, `vscode_unsaved_files`, `vscode_debugging`, `vscode_bridge_status` | From the active window |
+| Action | `select-window` | Pin or unpin the current window, switch to the next one, or pin a workspace. Its Macro Deck button shows *Pinned* or *Following*; in VS Code, the pinned window's status bar item shows a pin |
+| Variables | `vscode_workspace`, `vscode_active_file`, `vscode_language`, `vscode_git_branch`, `vscode_errors`, `vscode_warnings`, `vscode_unsaved_files`, `vscode_debugging` | About the default window, the one buttons set to *Active window* control |
+| Variables | `vscode_connected`, `vscode_window_count`, `vscode_target_pinned`, `vscode_bridge_status` | About the bridge: whether a window is connected, how many, whether one is pinned, and whether the plugin is listening |
 | Events | `file-saved`, `debug-started`, `debug-stopped`, `task-finished` | From any window |
 | Issue | `port-in-use` | Opens setup to choose another port |
 
