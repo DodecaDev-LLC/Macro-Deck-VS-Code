@@ -124,21 +124,24 @@ function showStatus(status: ConnectionStatus): void {
 
 	let [label, tooltip] = text[status.kind];
 	statusItem.command = "macroDeckBridge.copyPairingToken";
+	statusItem.color = undefined;
 
 	if (status.kind === "connected") {
-		// Which window the deck's buttons go to, and a click to change that.
+		// Marks the default window: where buttons set to "Active window" go. Buttons bound to a workspace or
+		// to all windows ignore it, so this is "default", not "the only one Macro Deck can reach".
 		statusItem.command = "macroDeckBridge.togglePin";
+		const reachNote = "Buttons set to a workspace or to All windows act regardless.";
 		if (isTarget() && target.pinned) {
 			label = "$(pinned) Macro Deck";
-			tooltip = "Macro Deck controls this window (pinned). Click to unpin and follow the focused window.";
+			tooltip = `Buttons set to Active window control this window (pinned). ${reachNote} Click to unpin and follow the focused window.`;
 		} else if (isTarget()) {
-			label = "$(target) Macro Deck";
-			tooltip = "Macro Deck controls this window, because you used it last. Click to pin it.";
+			tooltip = `Buttons set to Active window control this window, because you used it last. ${reachNote} Click to pin it.`;
 		} else {
+			// Dimmed: connected, but not the default window.
+			statusItem.color = new vscode.ThemeColor("disabledForeground");
 			const other = target.workspace ? `"${target.workspace}"` : "another window";
-			tooltip = target.pinned
-				? `Connected. Macro Deck controls ${other} (pinned). Click to pin this window instead.`
-				: `Connected. Macro Deck controls ${other}. Click to pin this window instead.`;
+			tooltip = `Connected. Buttons set to Active window control ${other}${target.pinned ? " (pinned)" : ""}; `
+				+ "buttons set to this workspace or to All windows still reach this one. Click to pin this window instead.";
 		}
 	}
 

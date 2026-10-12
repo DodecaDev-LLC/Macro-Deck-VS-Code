@@ -49,8 +49,9 @@ Every action has an optional **Window** field. In order:
    a window reload, and stay dormant while that workspace is closed.
 3. **The focused window**, else the one used most recently.
 
-The status bar shows the target: a pin icon in the pinned window, a target icon in the window followed by
-focus, a plug everywhere else (its tooltip names the window that is controlled).
+The status bar marks the *default* window, the one buttons set to *Active window* control: a pin icon
+when it is pinned, a plain plug when it follows focus, and a dimmed plug in every other window (whose
+tooltip names the default). Buttons bound to a workspace or to All windows ignore the default.
 
 ### Building and testing both halves
 
