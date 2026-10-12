@@ -180,4 +180,88 @@
   <data name="Issues.Unknown" xml:space="preserve">
     <value>This issue is no longer known.</value>
   </data>
+  <data name="Actions.DebugControl.Name" xml:space="preserve">
+    <value>Control VS Code debugger</value>
+  </data>
+  <data name="Actions.DebugControl.Description" xml:space="preserve">
+    <value>Starts, stops or steps the debugger in the active VS Code window. The button shows whether debugging is stopped, running or paused.</value>
+  </data>
+  <data name="Actions.DebugControl.Command.Label" xml:space="preserve">
+    <value>Debug command</value>
+  </data>
+  <data name="Actions.DebugControl.Commands.Toggle" xml:space="preserve">
+    <value>Start or stop</value>
+  </data>
+  <data name="Actions.DebugControl.Commands.Start" xml:space="preserve">
+    <value>Start debugging</value>
+  </data>
+  <data name="Actions.DebugControl.Commands.Stop" xml:space="preserve">
+    <value>Stop debugging</value>
+  </data>
+  <data name="Actions.DebugControl.Commands.Restart" xml:space="preserve">
+    <value>Restart</value>
+  </data>
+  <data name="Actions.DebugControl.Commands.Continue" xml:space="preserve">
+    <value>Continue</value>
+  </data>
+  <data name="Actions.DebugControl.Commands.Pause" xml:space="preserve">
+    <value>Pause</value>
+  </data>
+  <data name="Actions.DebugControl.Commands.StepOver" xml:space="preserve">
+    <value>Step over</value>
+  </data>
+  <data name="Actions.DebugControl.Commands.StepInto" xml:space="preserve">
+    <value>Step into</value>
+  </data>
+  <data name="Actions.DebugControl.Commands.StepOut" xml:space="preserve">
+    <value>Step out</value>
+  </data>
+  <data name="Actions.DebugControl.Configuration.Label" xml:space="preserve">
+    <value>Launch configuration</value>
+  </data>
+  <data name="Actions.DebugControl.Configuration.Description" xml:space="preserve">
+    <value>Which configuration from launch.json to start. Leave empty to start the one selected in VS Code's Run and Debug view.</value>
+  </data>
+  <data name="Actions.DebugControl.Configuration.Placeholder" xml:space="preserve">
+    <value>Selected in VS Code</value>
+  </data>
+  <data name="Actions.DebugControl.States.Running" xml:space="preserve">
+    <value>Running</value>
+  </data>
+  <data name="Variables.DebugState" xml:space="preserve">
+    <value>Debug state</value>
+  </data>
+  <data name="Actions.RunInTerminal.Name" xml:space="preserve">
+    <value>Run in VS Code terminal</value>
+  </data>
+  <data name="Actions.RunInTerminal.Description" xml:space="preserve">
+    <value>Runs a command line in a named terminal of the active VS Code window, creating the terminal if needed.</value>
+  </data>
+  <data name="Actions.RunInTerminal.CommandLine.Label" xml:space="preserve">
+    <value>Command line</value>
+  </data>
+  <data name="Actions.RunInTerminal.CommandLine.Description" xml:space="preserve">
+    <value>What to type into the terminal. Each line runs as its own command.</value>
+  </data>
+  <data name="Actions.RunInTerminal.CommandLine.Placeholder" xml:space="preserve">
+    <value>npm run dev</value>
+  </data>
+  <data name="Actions.RunInTerminal.Terminal.Label" xml:space="preserve">
+    <value>Terminal</value>
+  </data>
+  <data name="Actions.RunInTerminal.Terminal.Description" xml:space="preserve">
+    <value>The terminal to use, by name. It is created if no terminal has this name. Leave empty to use one called "Macro Deck".</value>
+  </data>
+  <data name="Actions.RunInTerminal.Terminal.Placeholder" xml:space="preserve">
+    <value>Macro Deck</value>
+  </data>
+  <data name="Actions.RunInTerminal.Focus.Label" xml:space="preserve">
+    <value>Show and focus the terminal</value>
+  </data>
+  <data name="Actions.RunInTerminal.Interrupt.Label" xml:space="preserve">
+    <value>Stop what is running first</value>
+  </data>
+  <data name="Actions.RunInTerminal.Interrupt.Description" xml:space="preserve">
+    <value>Sends Ctrl+C before the command, so a button can restart a server that is still running.</value>
+  </data>
 </root>

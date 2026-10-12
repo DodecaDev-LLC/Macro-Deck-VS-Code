@@ -131,9 +131,138 @@ async function handleRequest(method: string, params: Record<string, unknown>): P
 			return null;
 		}
 
+		case "listTerminals":
+			return vscode.window.terminals.map((t) => ({ id: t.name, label: t.name }));
+
+		case "runInTerminal":
+			return runInTerminal(
+				String(params.commandLine ?? ""),
+				String(params.terminal || "Macro Deck"),
+				params.focus !== false,
+				params.interrupt === true);
+
+		case "listLaunchConfigs":
+			return listLaunchConfigs();
+
+		case "debug":
+			return runDebugCommand(String(params.command ?? ""), typeof params.configuration === "string" ? params.configuration : undefined);
+
 		default:
 			throw new Error(`Unknown request "${method}". Update the Macro Deck Bridge extension.`);
 	}
+}
+
+const SHELL_INTEGRATION_WAIT_MS = 3_000;
+const INTERRUPT_SETTLE_MS = 500;
+
+async function runInTerminal(commandLine: string, name: string, focus: boolean, interrupt: boolean): Promise<null> {
+	if (!commandLine.trim()) {
+		throw new Error("No command line to run.");
+	}
+
+	let terminal = vscode.window.terminals.find((t) => t.name === name && t.exitStatus === undefined);
+	const created = !terminal;
+	terminal ??= vscode.window.createTerminal({ name });
+
+	if (focus) {
+		terminal.show(false);
+	}
+
+	if (interrupt && !created) {
+		terminal.sendText("\u0003", false);
+		// The interrupted program needs a moment to exit and the shell to redraw its prompt.
+		await new Promise((resolve) => setTimeout(resolve, INTERRUPT_SETTLE_MS));
+	}
+
+	// Shell integration runs the line as a real command (correct quoting, no typing into a half-drawn
+	// prompt); a new terminal needs a moment before it reports it. Without it, type the text instead.
+	const shell = terminal.shellIntegration ?? (created ? await waitForShellIntegration(terminal) : undefined);
+	const lines = commandLine.split(/\r?\n/).filter((l) => l.trim().length > 0);
+	if (shell && lines.length === 1) {
+		shell.executeCommand(lines[0]);
+	} else {
+		terminal.sendText(lines.join("\n"), true);
+	}
+
+	return null;
+}
+
+function waitForShellIntegration(terminal: vscode.Terminal): Promise<vscode.TerminalShellIntegration | undefined> {
+	return new Promise((resolve) => {
+		const timer = setTimeout(() => { listener.dispose(); resolve(undefined); }, SHELL_INTEGRATION_WAIT_MS);
+		const listener = vscode.window.onDidChangeTerminalShellIntegration((e) => {
+			if (e.terminal === terminal) {
+				clearTimeout(timer);
+				listener.dispose();
+				resolve(e.shellIntegration);
+			}
+		});
+	});
+}
+
+const DEBUG_COMMANDS: Record<string, string> = {
+	stop: "workbench.action.debug.stop",
+	restart: "workbench.action.debug.restart",
+	continue: "workbench.action.debug.continue",
+	pause: "workbench.action.debug.pause",
+	"step-over": "workbench.action.debug.stepOver",
+	"step-into": "workbench.action.debug.stepInto",
+	"step-out": "workbench.action.debug.stepOut",
+};
+
+async function runDebugCommand(command: string, configuration: string | undefined): Promise<null> {
+	if (command === "toggle") {
+		command = vscode.debug.activeDebugSession ? "stop" : "start";
+	}
+
+	if (command === "start") {
+		if (!configuration) {
+			// Whatever is selected in the Run and Debug view, exactly as F5 would.
+			await vscode.commands.executeCommand("workbench.action.debug.start");
+			return null;
+		}
+
+		const folder = vscode.workspace.workspaceFolders?.find((f) =>
+			launchConfigNames(f).includes(configuration)) ?? vscode.workspace.workspaceFolders?.[0];
+		if (!await vscode.debug.startDebugging(folder, configuration)) {
+			throw new Error(`Could not start "${configuration}". Check that it exists in launch.json.`);
+		}
+
+		return null;
+	}
+
+	const id = DEBUG_COMMANDS[command];
+	if (!id) {
+		throw new Error(`Unknown debug command "${command}". Update the Macro Deck Bridge extension.`);
+	}
+
+	await vscode.commands.executeCommand(id);
+	return null;
+}
+
+function launchConfigNames(folder?: vscode.WorkspaceFolder): string[] {
+	const launch = vscode.workspace.getConfiguration("launch", folder?.uri);
+	const names = (list: unknown) => Array.isArray(list)
+		? list.map((c) => c?.name).filter((n): n is string => typeof n === "string")
+		: [];
+	return [...names(launch.get("configurations")), ...names(launch.get("compounds"))];
+}
+
+/** Launch configurations and compounds from every workspace folder's launch.json and the workspace file. */
+function listLaunchConfigs(): { id: string; label: string }[] {
+	const folders = vscode.workspace.workspaceFolders ?? [];
+	const seen = new Set<string>();
+	const result: { id: string; label: string }[] = [];
+	for (const folder of folders.length > 0 ? folders : [undefined]) {
+		for (const name of launchConfigNames(folder)) {
+			if (!seen.has(name)) {
+				seen.add(name);
+				result.push({ id: name, label: folders.length > 1 && folder ? `${name} (${folder.name})` : name });
+			}
+		}
+	}
+
+	return result;
 }
 
 /** Every command id, labelled with its Command Palette title where an extension contributes one. */
@@ -167,6 +296,7 @@ function watchState(context: vscode.ExtensionContext): void {
 		vscode.workspace.onDidCloseTextDocument(scheduleState),
 		vscode.workspace.onDidChangeWorkspaceFolders(scheduleState),
 		vscode.debug.onDidChangeActiveDebugSession(scheduleState),
+		vscode.debug.onDidChangeActiveStackItem(scheduleState),
 		vscode.debug.onDidStartDebugSession(scheduleState),
 		vscode.debug.onDidTerminateDebugSession(scheduleState),
 		{ dispose: () => clearTimeout(stateTimer) },
@@ -212,9 +342,20 @@ function sendStateNow(): void {
 			errors,
 			warnings,
 			debugging: vscode.debug.activeDebugSession !== undefined,
+			debugState: debugState(),
 			unsavedFiles: vscode.workspace.textDocuments.filter((d) => d.isDirty).length,
 		},
 	});
+}
+
+/** A selected stack frame only exists while execution is stopped at a breakpoint or step, and VS Code
+ * reports it in every window kind, unlike debug adapter trackers, which only see local adapters. */
+function debugState(): "stopped" | "running" | "paused" {
+	if (!vscode.debug.activeDebugSession) {
+		return "stopped";
+	}
+
+	return vscode.debug.activeStackItem instanceof vscode.DebugStackFrame ? "paused" : "running";
 }
 
 // ---- Git branch ----------------------------------------------------------------------------------

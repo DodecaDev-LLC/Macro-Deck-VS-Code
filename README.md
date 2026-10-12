@@ -33,7 +33,9 @@ process that merely took the port. Connections with an `Origin` header (browsers
 | --- | --- | --- |
 | Action | `run-command` | Any command id, with optional JSON arguments; dropdown lists the window's commands |
 | Action | `run-task` | Any task from the workspace (tasks.json, npm scripts, ...) |
-| Variables | `vscode_connected`, `vscode_window_count`, `vscode_workspace`, `vscode_active_file`, `vscode_language`, `vscode_git_branch`, `vscode_errors`, `vscode_warnings`, `vscode_unsaved_files`, `vscode_debugging`, `vscode_bridge_status` | From the active window |
+| Action | `run-in-terminal` | Runs a command line in a named terminal (created if missing); can Ctrl+C first to restart |
+| Action | `debug-control` | Start/stop, restart, continue, pause, step; button shows stopped, running or paused |
+| Variables | `vscode_connected`, `vscode_window_count`, `vscode_workspace`, `vscode_active_file`, `vscode_language`, `vscode_git_branch`, `vscode_errors`, `vscode_warnings`, `vscode_unsaved_files`, `vscode_debugging`, `vscode_debug_state`, `vscode_bridge_status` | From the active window |
 | Events | `file-saved`, `debug-started`, `debug-stopped`, `task-finished` | From any window |
 | Issue | `port-in-use` | Opens setup to choose another port |
 

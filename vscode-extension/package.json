@@ -2,7 +2,7 @@
   "name": "macro-deck-bridge",
   "displayName": "Macro Deck Bridge",
   "description": "Connects VS Code to the VS Code Plugin for Macro Deck: run commands and tasks from your deck, and show the active file, Git branch and problem counts on its buttons.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "publisher": "dodecadev",
   "license": "MIT",
   "repository": {

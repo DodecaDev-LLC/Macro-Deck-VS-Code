@@ -42,7 +42,7 @@ public sealed class PluginIntegration : IPluginIntegration, IVariableProvider, I
 	{
 		_bridge = bridge;
 		_logger = logger.ForContext<PluginIntegration>();
-		Actions = [new RunCommandAction(bridge), new RunTaskAction(bridge)];
+		Actions = [new RunCommandAction(bridge), new RunTaskAction(bridge), new DebugControlAction(bridge), new RunInTerminalAction(bridge)];
 	}
 
 	public IReadOnlyList<IActionDefinition> Actions { get; }
@@ -156,7 +156,9 @@ public sealed class PluginIntegration : IPluginIntegration, IVariableProvider, I
 		VariableDefinition.Eager("vscode_unsaved_files", VariableType.Numeric) with
 			{ Id = "unsaved-files", DisplayName = Strings.Variables.UnsavedFiles() },
 		VariableDefinition.Eager("vscode_debugging", VariableType.Boolean) with
-			{ Id = "debugging", DisplayName = Strings.Variables.Debugging() }
+			{ Id = "debugging", DisplayName = Strings.Variables.Debugging() },
+		VariableDefinition.Eager("vscode_debug_state", VariableType.Text) with
+			{ Id = "debug-state", DisplayName = Strings.Variables.DebugState() }
 	];
 
 	/// <summary>Answers from the state the windows last pushed; never touches the socket.</summary>
@@ -179,6 +181,7 @@ public sealed class PluginIntegration : IPluginIntegration, IVariableProvider, I
 			"warnings" => VariableReading.Of(state.Warnings),
 			"unsaved-files" => VariableReading.Of(state.UnsavedFiles),
 			"debugging" => VariableReading.Of(state.Debugging),
+			"debug-state" => VariableReading.Of(state.DebugState ?? (state.Debugging ? "running" : "stopped")),
 			_ => VariableReading.Unavailable
 		});
 	}

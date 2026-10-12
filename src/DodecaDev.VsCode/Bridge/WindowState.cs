@@ -17,6 +17,9 @@ internal sealed record WindowState
 	[JsonPropertyName("errors")] public int Errors { get; init; }
 	[JsonPropertyName("warnings")] public int Warnings { get; init; }
 	[JsonPropertyName("debugging")] public bool Debugging { get; init; }
+
+	/// <summary><c>stopped</c>, <c>running</c> or <c>paused</c>; null from extensions older than 1.1.0.</summary>
+	[JsonPropertyName("debugState")] public string? DebugState { get; init; }
 	[JsonPropertyName("unsavedFiles")] public int UnsavedFiles { get; init; }
 }
 

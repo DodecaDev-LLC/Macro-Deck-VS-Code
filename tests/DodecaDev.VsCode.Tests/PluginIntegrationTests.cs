@@ -121,6 +121,109 @@ public sealed class PluginIntegrationTests
 		Assert.That(request["params"]!["args"]!.ToJsonString(), Is.EqualTo("[\"build\"]"));
 	}
 
+	private static async Task<string?> DebugButtonStateAsync(PluginTestHarness harness)
+		=> (await harness.Actions.GetActionStateAsync("debug-control")).Data!.Value.GetProperty("activeStateId").GetString();
+
+	[Test]
+	public async Task The_debug_button_follows_the_window_from_unavailable_to_paused()
+	{
+		var (harness, port) = await PairedHarnessAsync();
+		await using var _ = harness;
+
+		Assert.That(await DebugButtonStateAsync(harness), Is.EqualTo("unavailable"));
+
+		var (window, _) = await FakeVsCodeWindow.ConnectAsync(port, Token);
+		await using var __ = window;
+		await window.SendStateAsync(new JsonObject { ["focused"] = true, ["debugging"] = true, ["debugState"] = "paused" });
+		await RoundTripAsync(harness, window);
+
+		Assert.That(await DebugButtonStateAsync(harness), Is.EqualTo("paused"));
+		Assert.That((await ReadAsync(harness, "debug-state")).Value.Text, Is.EqualTo("paused"));
+	}
+
+	[Test]
+	public async Task An_older_extension_without_debug_state_still_shows_running()
+	{
+		var (harness, port) = await PairedHarnessAsync();
+		await using var _ = harness;
+		var (window, _) = await FakeVsCodeWindow.ConnectAsync(port, Token);
+		await using var __ = window;
+
+		await window.SendStateAsync(new JsonObject { ["focused"] = true, ["debugging"] = true });
+		await RoundTripAsync(harness, window);
+
+		Assert.That(await DebugButtonStateAsync(harness), Is.EqualTo("running"));
+	}
+
+	[Test]
+	public async Task Debug_control_sends_the_command_and_configuration()
+	{
+		var (harness, port) = await PairedHarnessAsync();
+		await using var _ = harness;
+		var (window, _) = await FakeVsCodeWindow.ConnectAsync(port, Token);
+		await using var __ = window;
+
+		var execution = harness.Actions.ExecuteAsync("debug-control", new Dictionary<string, object?>
+		{
+			["command"] = "start",
+			["configuration"] = "Launch API"
+		});
+		var request = await window.AnswerNextRequestAsync();
+
+		Assert.That((await execution).Succeeded, Is.True);
+		Assert.That((string?)request["method"], Is.EqualTo("debug"));
+		Assert.That((string?)request["params"]!["command"], Is.EqualTo("start"));
+		Assert.That((string?)request["params"]!["configuration"], Is.EqualTo("Launch API"));
+	}
+
+	[Test]
+	public async Task Debug_control_refuses_an_unknown_command_without_contacting_VS_Code()
+	{
+		var (harness, port) = await PairedHarnessAsync();
+		await using var _ = harness;
+		var (window, _) = await FakeVsCodeWindow.ConnectAsync(port, Token);
+		await using var __ = window;
+
+		var outcome = await harness.Actions.ExecuteAsync("debug-control",
+			new Dictionary<string, object?> { ["command"] = "launch-rockets" });
+
+		Assert.That(outcome.Succeeded, Is.False);
+	}
+
+	[Test]
+	public async Task Run_in_terminal_defaults_to_the_Macro_Deck_terminal_and_focuses_it()
+	{
+		var (harness, port) = await PairedHarnessAsync();
+		await using var _ = harness;
+		var (window, _) = await FakeVsCodeWindow.ConnectAsync(port, Token);
+		await using var __ = window;
+
+		var execution = harness.Actions.ExecuteAsync("run-in-terminal",
+			new Dictionary<string, object?> { ["commandLine"] = "npm run dev\n", ["interrupt"] = "true" });
+		var request = await window.AnswerNextRequestAsync();
+
+		Assert.That((await execution).Succeeded, Is.True);
+		Assert.That((string?)request["method"], Is.EqualTo("runInTerminal"));
+		Assert.That((string?)request["params"]!["commandLine"], Is.EqualTo("npm run dev"));
+		Assert.That((string?)request["params"]!["terminal"], Is.EqualTo("Macro Deck"));
+		Assert.That((bool?)request["params"]!["focus"], Is.True);
+		Assert.That((bool?)request["params"]!["interrupt"], Is.True);
+	}
+
+	[Test]
+	public async Task Run_in_terminal_refuses_a_blank_command_line()
+	{
+		var (harness, port) = await PairedHarnessAsync();
+		await using var _ = harness;
+		var (window, _) = await FakeVsCodeWindow.ConnectAsync(port, Token);
+		await using var __ = window;
+
+		var outcome = await harness.Actions.ExecuteAsync("run-in-terminal",
+			new Dictionary<string, object?> { ["commandLine"] = "  \n " });
+
+		Assert.That(outcome.Succeeded, Is.False);
+	}
+
 	[Test]
 	public async Task A_command_VS_Code_rejects_fails_the_action()
 	{
