@@ -8,7 +8,7 @@ namespace DodecaDev.VsCode.Bridge;
 /// proves itself first, so a VS Code window never obeys a process that merely grabbed the port, and
 /// the window proves itself second, so the deck never talks to a client the user did not pair.
 /// </summary>
-/// <remarks>Must stay byte-for-byte in step with <c>vscode-extension/src/auth.ts</c>.</remarks>
+/// <remarks>Must stay byte-for-byte in step with <c>vscode-extension/src/auth.ts</c> at the repository root.</remarks>
 internal static class BridgeAuth
 {
 	internal const string ServerRole = "server";

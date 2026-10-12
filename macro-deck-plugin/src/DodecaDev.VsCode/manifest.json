@@ -4,7 +4,7 @@
   "id": "com.dodecadev.vscode",
   "name": "VS Code Plugin",
   "version": "1.0.0",
-  "description": "Control Visual Studio Code from Macro Deck: run any editor command, start and stop debugging, run tasks, and show the active file, Git branch and problem counts on your buttons. Needs the companion Macro Deck Bridge extension installed in VS Code.",
+  "description": "Control Visual Studio Code from Macro Deck: run any editor command or task, choose which VS Code window each button controls, and show the active file, Git branch and problem counts on your buttons. Needs the companion Macro Deck Bridge extension installed in VS Code.",
   "icon": "Assets/icon.svg",
   "entrypoints": {
     "win-x64": {

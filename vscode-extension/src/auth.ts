@@ -1,6 +1,6 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
-// Must stay byte-for-byte in step with src/DodecaDev.VsCode/Bridge/BridgeAuth.cs in the plugin.
+// Must stay byte-for-byte in step with macro-deck-plugin/src/DodecaDev.VsCode/Bridge/BridgeAuth.cs.
 
 export const SERVER_ROLE = "server";
 export const CLIENT_ROLE = "client";

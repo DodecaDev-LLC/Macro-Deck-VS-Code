@@ -12,7 +12,7 @@ namespace DodecaDev.VsCode.Tests;
 [TestFixture]
 public sealed class BridgeAuthTests
 {
-	/// <summary>The same vector is pinned in <c>vscode-extension/test/bridge.test.js</c>.</summary>
+	/// <summary>The same vector is pinned in <c>vscode-extension/test/bridge.test.js</c> at the repository root.</summary>
 	[Test]
 	public void The_proof_matches_the_vector_the_extension_tests_pin()
 	{
@@ -45,7 +45,7 @@ public sealed class BridgeInteropTests
 		harness.Context.Config.SeedString(entryId, "port", port.ToString(CultureInfo.InvariantCulture));
 		await harness.InitializeIntegrationsAsync();
 
-		var extensionDir = Path.GetFullPath(Path.Combine(TestContext.CurrentContext.TestDirectory, "../../../../../vscode-extension"));
+		var extensionDir = Path.GetFullPath(Path.Combine(TestContext.CurrentContext.TestDirectory, "../../../../../../vscode-extension"));
 		var script = """
 			const { BridgeClient } = require("./out/bridgeClient.js");
 			const [port, token] = process.argv.slice(1);

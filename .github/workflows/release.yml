@@ -15,7 +15,9 @@ jobs:
       id-token: write
     with:
       version: ${{ github.event.release.tag_name }}
-      source: src/DodecaDev.VsCode
+      source: macro-deck-plugin/src/DodecaDev.VsCode
+      # The solution is not at the repository root, so point the test step at it.
+      test-path: macro-deck-plugin/DodecaDev.VsCode.slnx
       changelog: ${{ github.event.release.body }}
       # Pinned: the default ("newest prerelease") has resolved to a CLI below the Store's minimum.
       # Keep it at or above minimumCliVersion from
