@@ -38,12 +38,14 @@ function fakePlugin(serverToken, onWindow) {
 
 function client(port, token, onRequest = async () => null) {
 	const statuses = [];
+	const notices = [];
 	const c = new BridgeClient({
 		port, token, windowId: "w1", onRequest,
 		onStatus: (s) => statuses.push(s.kind),
 		onConnected: () => c.send({ type: "state", state: { focused: true, errors: 2 } }),
+		onNotice: (m) => notices.push(m),
 	});
-	return { c, statuses };
+	return { c, statuses, notices };
 }
 
 test("a paired window reports its state and answers requests", async () => {
@@ -63,6 +65,19 @@ test("a paired window reports its state and answers requests", async () => {
 	const response = messages.find((m) => m.type === "response");
 	assert.deepEqual(response, { type: "response", id: 7, ok: true, result: { method: "executeCommand", params: { command: "x" } } });
 	assert.ok(statuses.includes("connected"));
+	c.stop();
+	server.close();
+});
+
+test("notices from the plugin, such as the current target, reach the window", async () => {
+	const server = await fakePlugin(TOKEN, (socket) => {
+		socket.send(JSON.stringify({ type: "target", windowId: "w1", workspace: "alpha", pinned: true }));
+	});
+	const { c, notices } = client(server.address().port, TOKEN);
+	c.start();
+
+	await waitFor(() => notices.length > 0);
+	assert.deepEqual(notices[0], { type: "target", windowId: "w1", workspace: "alpha", pinned: true });
 	c.stop();
 	server.close();
 });

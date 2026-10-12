@@ -32,6 +32,8 @@ export interface BridgeClientOptions {
 	onStatus: (status: ConnectionStatus) => void;
 	/** Called on every (re)connect, so the plugin starts from the window's current state. */
 	onConnected: () => void;
+	/** Messages the plugin sends without expecting an answer, such as which window it controls. */
+	onNotice?: (message: Record<string, unknown>) => void;
 }
 
 const MIN_RETRY_MS = 1_000;
@@ -129,6 +131,8 @@ export class BridgeClient {
 
 			if (message.type === "request") {
 				void this.answer(socket, message);
+			} else {
+				this.options.onNotice?.(message);
 			}
 		});
 

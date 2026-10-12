@@ -31,14 +31,23 @@ internal sealed class RunCommandAction(BridgeServer bridge) : IDynamicOptionsAct
 		ActionParameter.MultilineText(ArgumentsParameter,
 			label: Strings.Actions.RunCommand.Arguments.Label(),
 			description: Strings.Actions.RunCommand.Arguments.Description(),
-			placeholder: Strings.Actions.RunCommand.Arguments.Placeholder())
+			placeholder: Strings.Actions.RunCommand.Arguments.Placeholder()),
+		WindowTarget.Parameter()
 	];
 
 	public async Task<DynamicOptionsResult> GetDynamicOptionsAsync(DynamicOptionsContext context, CancellationToken cancellationToken)
 	{
+		if (context.ParameterName == WindowTarget.ParameterName)
+		{
+			return WindowTarget.Options(bridge, context.Filter);
+		}
+
+		// The list comes from the window this button targets; with "all windows", from the active one.
+		var target = WindowTarget.Read(context.CurrentParameters);
+		target = target == BridgeServer.TargetAll ? null : target;
 		try
 		{
-			var commands = await bridge.RequestAsync("listCommands", null, cancellationToken);
+			var commands = await bridge.RequestAsync("listCommands", null, cancellationToken, target);
 			return BridgeOptions.Filtered(commands?.Deserialize<List<BridgeOption>>() ?? [], context.Filter);
 		}
 		catch (BridgeRequestException ex)
@@ -68,7 +77,7 @@ internal sealed class RunCommandAction(BridgeServer bridge) : IDynamicOptionsAct
 			{
 				await bridge.RequestAsync("executeCommand",
 					new JsonObject { ["command"] = command.Trim(), ["args"] = arguments },
-					context.CancellationToken);
+					context.CancellationToken, WindowTarget.Read(context.Parameters));
 				return ActionResult.Success();
 			}
 			catch (BridgeRequestException ex)

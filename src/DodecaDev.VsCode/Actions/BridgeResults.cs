@@ -9,6 +9,8 @@ internal static class BridgeResults
 {
 	internal static ActionResult Failed(BridgeRequestException ex) => ex.Failure switch
 	{
+		BridgeFailure.NoWindow when ex.Detail is { } workspace
+			=> ActionResult.Failed(ActionErrorCodes.NotConnected, Strings.Errors.WorkspaceNotOpen(workspace: workspace)),
 		BridgeFailure.NoWindow => ActionResult.Failed(ActionErrorCodes.NotConnected, Strings.Errors.NoWindow()),
 		BridgeFailure.Disconnected => ActionResult.Failed(ActionErrorCodes.NotConnected, Strings.Errors.Disconnected()),
 		BridgeFailure.Timeout => ActionResult.Failed(ActionErrorCodes.Timeout, Strings.Errors.Timeout()),
@@ -17,6 +19,7 @@ internal static class BridgeResults
 
 	internal static LocalizedText Message(BridgeRequestException ex) => ex.Failure switch
 	{
+		BridgeFailure.NoWindow when ex.Detail is { } workspace => Strings.Errors.WorkspaceNotOpen(workspace: workspace),
 		BridgeFailure.NoWindow => Strings.Errors.NoWindow(),
 		BridgeFailure.Disconnected => Strings.Errors.Disconnected(),
 		BridgeFailure.Timeout => Strings.Errors.Timeout(),

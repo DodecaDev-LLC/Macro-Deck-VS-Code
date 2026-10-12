@@ -9,6 +9,11 @@ const TOKEN_KEY = "macroDeckBridge.pairingToken";
 const STATE_DEBOUNCE_MS = 250;
 
 let client: BridgeClient | undefined;
+let lastStatus: ConnectionStatus = { kind: "connecting" };
+
+/** What the plugin last said about which window it controls. */
+interface Target { windowId: string | null; workspace: string | null; pinned: boolean }
+let target: Target = { windowId: null, workspace: null, pinned: false };
 let statusItem: vscode.StatusBarItem;
 let stateTimer: NodeJS.Timeout | undefined;
 const windowId = randomUUID();
@@ -33,6 +38,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 				await vscode.commands.executeCommand("macroDeckBridge.copyPairingToken");
 			}
 		}),
+		vscode.commands.registerCommand("macroDeckBridge.pinWindow", () => setPinned(true)),
+		vscode.commands.registerCommand("macroDeckBridge.unpinWindow", () => setPinned(false)),
+		vscode.commands.registerCommand("macroDeckBridge.togglePin", () => setPinned(!(isTarget() && target.pinned))),
 		vscode.commands.registerCommand("macroDeckBridge.reconnect", () => restart(context)),
 		// Every window shares the token, so a reset in one window reconnects all of them.
 		context.secrets.onDidChange((e) => e.key === TOKEN_KEY ? restart(context) : undefined),
@@ -77,11 +85,35 @@ async function restart(context: vscode.ExtensionContext): Promise<void> {
 		onRequest: handleRequest,
 		onStatus: showStatus,
 		onConnected: () => { sendStateNow(); void refreshGitBranch(); },
+		onNotice: (message) => {
+			if (message.type === "target") {
+				target = {
+					windowId: typeof message.windowId === "string" ? message.windowId : null,
+					workspace: typeof message.workspace === "string" ? message.workspace : null,
+					pinned: message.pinned === true,
+				};
+				showStatus(lastStatus);
+			}
+		},
 	});
 	client.start();
 }
 
+function isTarget(): boolean {
+	return target.windowId === windowId;
+}
+
+function setPinned(pinned: boolean): void {
+	if (!client?.connected) {
+		void vscode.window.showWarningMessage("Macro Deck is not connected, so there is nothing to pin yet.");
+		return;
+	}
+
+	client.send({ type: "pin", pinned });
+}
+
 function showStatus(status: ConnectionStatus): void {
+	lastStatus = status;
 	const text: Record<ConnectionStatus["kind"], [string, string]> = {
 		disabled: ["$(circle-slash) Macro Deck", "Macro Deck Bridge is turned off in settings."],
 		connecting: ["$(debug-disconnect) Macro Deck", "Waiting for Macro Deck. Is it running, with the VS Code Plugin set up?"],
@@ -90,10 +122,28 @@ function showStatus(status: ConnectionStatus): void {
 		outdated: ["$(warning) Macro Deck", "This extension and the Macro Deck plugin speak different protocol versions. Update both."],
 	};
 
-	const [label, tooltip] = text[status.kind];
+	let [label, tooltip] = text[status.kind];
+	statusItem.command = "macroDeckBridge.copyPairingToken";
+
+	if (status.kind === "connected") {
+		// Which window the deck's buttons go to, and a click to change that.
+		statusItem.command = "macroDeckBridge.togglePin";
+		if (isTarget() && target.pinned) {
+			label = "$(pinned) Macro Deck";
+			tooltip = "Macro Deck controls this window (pinned). Click to unpin and follow the focused window.";
+		} else if (isTarget()) {
+			label = "$(target) Macro Deck";
+			tooltip = "Macro Deck controls this window, because you used it last. Click to pin it.";
+		} else {
+			const other = target.workspace ? `"${target.workspace}"` : "another window";
+			tooltip = target.pinned
+				? `Connected. Macro Deck controls ${other} (pinned). Click to pin this window instead.`
+				: `Connected. Macro Deck controls ${other}. Click to pin this window instead.`;
+		}
+	}
+
 	statusItem.text = label;
 	statusItem.tooltip = status.kind === "outdated" ? `${tooltip} (${status.reason})` : tooltip;
-	statusItem.command = status.kind === "connected" ? undefined : "macroDeckBridge.copyPairingToken";
 	statusItem.show();
 }
 
@@ -205,6 +255,8 @@ function sendStateNow(): void {
 			focused: vscode.window.state.focused,
 			appName: vscode.env.appName,
 			workspace: vscode.workspace.name ?? null,
+			// Identifies the project across reloads, so a pin or a button bound to it still finds it.
+			workspaceKey: (vscode.workspace.workspaceFile ?? vscode.workspace.workspaceFolders?.[0]?.uri)?.toString() ?? null,
 			// Only the file name: the full path never leaves VS Code.
 			activeFile: document ? path.basename(document.fileName) : null,
 			language: document?.languageId ?? null,

@@ -42,7 +42,7 @@ public sealed class PluginIntegration : IPluginIntegration, IVariableProvider, I
 	{
 		_bridge = bridge;
 		_logger = logger.ForContext<PluginIntegration>();
-		Actions = [new RunCommandAction(bridge), new RunTaskAction(bridge)];
+		Actions = [new RunCommandAction(bridge), new RunTaskAction(bridge), new SelectWindowAction(bridge)];
 	}
 
 	public IReadOnlyList<IActionDefinition> Actions { get; }
@@ -141,6 +141,8 @@ public sealed class PluginIntegration : IPluginIntegration, IVariableProvider, I
 			{ Id = "connected", DisplayName = Strings.Variables.Connected() },
 		VariableDefinition.Eager("vscode_window_count", VariableType.Numeric) with
 			{ Id = "window-count", DisplayName = Strings.Variables.WindowCount() },
+		VariableDefinition.Eager("vscode_target_pinned", VariableType.Boolean) with
+			{ Id = "target-pinned", DisplayName = Strings.Variables.TargetPinned() },
 		VariableDefinition.Eager("vscode_workspace", VariableType.Text) with
 			{ Id = "workspace", DisplayName = Strings.Variables.Workspace() },
 		VariableDefinition.Eager("vscode_active_file", VariableType.Text) with
@@ -170,6 +172,7 @@ public sealed class PluginIntegration : IPluginIntegration, IVariableProvider, I
 			"bridge-status" => VariableReading.Of(_status),
 			"connected" => VariableReading.Of(window is not null),
 			"window-count" => VariableReading.Of(_bridge.Windows.Count),
+			"target-pinned" => VariableReading.Of(_bridge.ActiveIsPinned),
 			_ when state is null => VariableReading.Unavailable,
 			"workspace" => TextOrUnavailable(state.Workspace),
 			"active-file" => TextOrUnavailable(state.ActiveFile),

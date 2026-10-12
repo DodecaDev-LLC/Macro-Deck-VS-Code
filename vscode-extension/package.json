@@ -41,6 +41,16 @@
         "category": "Macro Deck"
       },
       {
+        "command": "macroDeckBridge.pinWindow",
+        "title": "Control This Window",
+        "category": "Macro Deck"
+      },
+      {
+        "command": "macroDeckBridge.unpinWindow",
+        "title": "Follow the Focused Window",
+        "category": "Macro Deck"
+      },
+      {
         "command": "macroDeckBridge.reconnect",
         "title": "Reconnect",
         "category": "Macro Deck"

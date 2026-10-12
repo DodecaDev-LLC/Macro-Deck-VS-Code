@@ -11,6 +11,10 @@ internal sealed record WindowState
 	[JsonPropertyName("focused")] public bool Focused { get; init; }
 	[JsonPropertyName("appName")] public string? AppName { get; init; }
 	[JsonPropertyName("workspace")] public string? Workspace { get; init; }
+
+	/// <summary>The workspace file or first folder as a URI: what identifies "the same project" across
+	/// window reloads, for pins and per-button targets. Null for a window with no folder open.</summary>
+	[JsonPropertyName("workspaceKey")] public string? WorkspaceKey { get; init; }
 	[JsonPropertyName("activeFile")] public string? ActiveFile { get; init; }
 	[JsonPropertyName("language")] public string? Language { get; init; }
 	[JsonPropertyName("gitBranch")] public string? GitBranch { get; init; }

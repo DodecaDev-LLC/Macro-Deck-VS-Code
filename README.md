@@ -15,7 +15,7 @@ Macro Deck ──protocol──▶ DodecaDev.VsCode (this plugin)
 ```
 
 - **`src/DodecaDev.VsCode`**: the Macro Deck plugin. It hosts a small loopback WebSocket hub and sends
-  actions to the *active* window (the focused one, else the one focused last).
+  actions to the window each button targets (see *Which window a button controls*).
 - **`vscode-extension/`**: the companion VS Code extension. Every window connects to the hub, pushes
   its state (debounced), forwards events, and runs the commands and tasks it is asked to.
   `extensionKind: ["ui"]` keeps it on the machine Macro Deck runs on, even in WSL, SSH or container
@@ -33,9 +33,24 @@ process that merely took the port. Connections with an `Origin` header (browsers
 | --- | --- | --- |
 | Action | `run-command` | Any command id, with optional JSON arguments; dropdown lists the window's commands |
 | Action | `run-task` | Any task from the workspace (tasks.json, npm scripts, ...) |
-| Variables | `vscode_connected`, `vscode_window_count`, `vscode_workspace`, `vscode_active_file`, `vscode_language`, `vscode_git_branch`, `vscode_errors`, `vscode_warnings`, `vscode_unsaved_files`, `vscode_debugging`, `vscode_bridge_status` | From the active window |
+| Action | `select-window` | Pin or unpin the current window, switch to the next one, or pin a workspace; button shows pinned or following |
+| Variables | `vscode_connected`, `vscode_window_count`, `vscode_target_pinned`, `vscode_workspace`, `vscode_active_file`, `vscode_language`, `vscode_git_branch`, `vscode_errors`, `vscode_warnings`, `vscode_unsaved_files`, `vscode_debugging`, `vscode_bridge_status` | From the active window |
 | Events | `file-saved`, `debug-started`, `debug-stopped`, `task-finished` | From any window |
 | Issue | `port-in-use` | Opens setup to choose another port |
+
+### Which window a button controls
+
+Every action has an optional **Window** field. In order:
+
+1. **A workspace chosen on the button** (picked from the open windows, or typed by name): that project,
+   wherever you are working. **All windows** sends to every window.
+2. **The pinned window**, when one is pinned: with *Macro Deck: Control This Window*, a click on the
+   status bar item, or the *Select VS Code window* action. Pins remember the workspace, so they survive
+   a window reload, and stay dormant while that workspace is closed.
+3. **The focused window**, else the one used most recently.
+
+The status bar shows the target: a pin icon in the pinned window, a target icon in the window followed by
+focus, a plug everywhere else (its tooltip names the window that is controlled).
 
 ### Building and testing both halves
 

@@ -37,7 +37,14 @@ internal sealed class VsCodeWindow : IDisposable
 	/// <summary>When the window last reported focus; picks the target when no window has focus now.</summary>
 	internal DateTimeOffset LastFocused { get; private set; } = DateTimeOffset.MinValue;
 
+	/// <summary>What a pin or a per-button target remembers this window by: its workspace, so the choice
+	/// survives a window reload, or the window itself when it has no folder open.</summary>
+	internal string TargetKey => State.WorkspaceKey is { Length: > 0 } key ? key : $"window:{Id}";
+
 	internal event Action<VsCodeWindow>? StateChanged;
+
+	/// <summary>The user ran "Control This Window" (true) or unpinned it (false) in this window.</summary>
+	internal event Action<VsCodeWindow, bool>? PinRequested;
 
 	internal event Action<VsCodeWindow, string, JsonObject?>? EventReceived;
 
@@ -159,6 +166,10 @@ internal sealed class VsCodeWindow : IDisposable
 						(string?)message["error"]?["message"]));
 				}
 
+				break;
+
+			case "pin":
+				PinRequested?.Invoke(this, message["pinned"]?.GetValue<bool>() ?? true);
 				break;
 
 			case "event" when message["name"]?.GetValue<string>() is { Length: > 0 } name:

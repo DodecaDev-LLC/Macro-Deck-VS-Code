@@ -19,6 +19,9 @@ internal sealed class FakeVsCodeWindow : IAsyncDisposable
 
 	internal WebSocketCloseStatus? CloseStatus => _socket.CloseStatus;
 
+	/// <summary>Every "target" notice the plugin sent, oldest first: which window it controls now.</summary>
+	internal List<JsonObject> TargetNotices { get; } = [];
+
 	internal static int FreePort()
 	{
 		using var listener = new TcpListener(IPAddress.Loopback, 0);
@@ -63,14 +66,35 @@ internal sealed class FakeVsCodeWindow : IAsyncDisposable
 	internal Task SendEventAsync(string name, JsonObject data)
 		=> SendAsync(new JsonObject { ["type"] = "event", ["name"] = name, ["data"] = data });
 
-	/// <summary>Waits for the plugin's next request and answers it.</summary>
+	/// <summary>Waits for the plugin's next request and answers it, recording any notices on the way.</summary>
 	internal async Task<JsonObject> AnswerNextRequestAsync(JsonNode? result = null, string? error = null)
 	{
-		var request = await ReceiveAsync() ?? throw new InvalidOperationException("The plugin closed the socket.");
+		var request = await NextRequestAsync() ?? throw new InvalidOperationException("The plugin closed the socket.");
 		await SendAsync(error is null
 			? new JsonObject { ["type"] = "response", ["id"] = request["id"]!.GetValue<int>(), ["ok"] = true, ["result"] = result }
 			: new JsonObject { ["type"] = "response", ["id"] = request["id"]!.GetValue<int>(), ["ok"] = false, ["error"] = new JsonObject { ["message"] = error } });
 		return request;
+	}
+
+	internal Task SendPinAsync(bool pinned) => SendAsync(new JsonObject { ["type"] = "pin", ["pinned"] = pinned });
+
+	/// <summary>Reads until the next request; "target" notices are kept in <see cref="TargetNotices"/>.</summary>
+	internal async Task<JsonObject?> NextRequestAsync()
+	{
+		while (await ReceiveAsync() is { } message)
+		{
+			if ((string?)message["type"] == "request")
+			{
+				return message;
+			}
+
+			if ((string?)message["type"] == "target")
+			{
+				TargetNotices.Add(message);
+			}
+		}
+
+		return null;
 	}
 
 	internal async Task SendAsync(JsonObject message)

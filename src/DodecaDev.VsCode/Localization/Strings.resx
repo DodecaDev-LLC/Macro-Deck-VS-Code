@@ -180,4 +180,59 @@
   <data name="Issues.Unknown" xml:space="preserve">
     <value>This issue is no longer known.</value>
   </data>
+  <data name="Actions.Window.Label" xml:space="preserve">
+    <value>Window</value>
+  </data>
+  <data name="Actions.Window.Description" xml:space="preserve">
+    <value>Which VS Code window this button controls. Leave empty for the active window: the pinned one, else the one you used last. Pick a workspace to always control that project, or All windows.</value>
+  </data>
+  <data name="Actions.Window.DescriptionSingle" xml:space="preserve">
+    <value>The workspace to pin. Leave empty to pin the window you are using.</value>
+  </data>
+  <data name="Actions.Window.Placeholder" xml:space="preserve">
+    <value>Active window</value>
+  </data>
+  <data name="Actions.Window.Active" xml:space="preserve">
+    <value>Active window</value>
+  </data>
+  <data name="Actions.Window.All" xml:space="preserve">
+    <value>All windows</value>
+  </data>
+  <data name="Actions.Window.NoFolder" xml:space="preserve">
+    <value>Window without a folder</value>
+  </data>
+  <data name="Actions.SelectWindow.Name" xml:space="preserve">
+    <value>Select VS Code window</value>
+  </data>
+  <data name="Actions.SelectWindow.Description" xml:space="preserve">
+    <value>Chooses which VS Code window the other buttons control: pin the window you are using, switch to the next one, or go back to following the window you use.</value>
+  </data>
+  <data name="Actions.SelectWindow.Mode.Label" xml:space="preserve">
+    <value>What to do</value>
+  </data>
+  <data name="Actions.SelectWindow.Modes.Toggle" xml:space="preserve">
+    <value>Pin or unpin the current window</value>
+  </data>
+  <data name="Actions.SelectWindow.Modes.Next" xml:space="preserve">
+    <value>Switch to the next window</value>
+  </data>
+  <data name="Actions.SelectWindow.Modes.Pin" xml:space="preserve">
+    <value>Pin a workspace</value>
+  </data>
+  <data name="Actions.SelectWindow.Modes.Unpin" xml:space="preserve">
+    <value>Follow the window I use</value>
+  </data>
+  <data name="Actions.SelectWindow.States.Pinned" xml:space="preserve">
+    <value>Pinned</value>
+  </data>
+  <data name="Actions.SelectWindow.States.Following" xml:space="preserve">
+    <value>Following</value>
+  </data>
+  <data name="Variables.TargetPinned" xml:space="preserve">
+    <value>Window pinned</value>
+  </data>
+  <data name="Errors.WorkspaceNotOpen" xml:space="preserve">
+    <value>"{workspace}" is not open in VS Code.</value>
+    <comment>[workspace:string] A VS Code workspace or folder name.</comment>
+  </data>
 </root>

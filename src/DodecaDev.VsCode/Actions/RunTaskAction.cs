@@ -23,14 +23,23 @@ internal sealed class RunTaskAction(BridgeServer bridge) : IDynamicOptionsAction
 		ActionParameter.Autocomplete(TaskParameter,
 			label: Strings.Actions.RunTask.Task.Label(),
 			description: Strings.Actions.RunTask.Task.Description(),
-			required: true)
+			required: true),
+		WindowTarget.Parameter()
 	];
 
 	public async Task<DynamicOptionsResult> GetDynamicOptionsAsync(DynamicOptionsContext context, CancellationToken cancellationToken)
 	{
+		if (context.ParameterName == WindowTarget.ParameterName)
+		{
+			return WindowTarget.Options(bridge, context.Filter);
+		}
+
+		// The list comes from the window this button targets; with "all windows", from the active one.
+		var target = WindowTarget.Read(context.CurrentParameters);
+		target = target == BridgeServer.TargetAll ? null : target;
 		try
 		{
-			var tasks = await bridge.RequestAsync("listTasks", null, cancellationToken);
+			var tasks = await bridge.RequestAsync("listTasks", null, cancellationToken, target);
 			return BridgeOptions.Filtered(tasks?.Deserialize<List<BridgeOption>>() ?? [], context.Filter);
 		}
 		catch (BridgeRequestException ex)
@@ -55,7 +64,8 @@ internal sealed class RunTaskAction(BridgeServer bridge) : IDynamicOptionsAction
 			{
 				// The window answers once the task has started, not when it ends: the task-finished event
 				// reports the outcome.
-				await bridge.RequestAsync("runTask", new JsonObject { ["task"] = task }, context.CancellationToken);
+				await bridge.RequestAsync("runTask", new JsonObject { ["task"] = task }, context.CancellationToken,
+					WindowTarget.Read(context.Parameters));
 				return ActionResult.Success();
 			}
 			catch (BridgeRequestException ex)

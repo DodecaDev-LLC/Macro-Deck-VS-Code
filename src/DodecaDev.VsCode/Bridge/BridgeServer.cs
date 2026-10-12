@@ -25,6 +25,10 @@ public sealed class BridgeServer : IAsyncDisposable
 	internal const int DefaultPort = 51741;
 	internal const string Path = "/macro-deck-bridge";
 
+	/// <summary>Per-button target values; anything else names a workspace.</summary>
+	internal const string TargetActive = "active";
+	internal const string TargetAll = "all";
+
 	private const string WebSocketGuid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 	private const int MaxRequestHeaderBytes = 8 * 1024;
 
@@ -40,6 +44,8 @@ public sealed class BridgeServer : IAsyncDisposable
 	private CancellationTokenSource? _stopping;
 	private int _port;
 	private string _token = "";
+	private readonly Lock _targetLock = new();
+	private (string? WindowId, bool Pinned)? _lastTarget;
 
 	public BridgeServer(ILogger logger) => _logger = logger.ForContext<BridgeServer>();
 
@@ -50,11 +56,28 @@ public sealed class BridgeServer : IAsyncDisposable
 
 	internal IReadOnlyCollection<VsCodeWindow> Windows => [.. _windows.Values];
 
-	/// <summary>The window actions go to: the focused one, else the one focused most recently.</summary>
-	internal VsCodeWindow? ActiveWindow => _windows.Values
-		.OrderByDescending(w => w.State.Focused)
-		.ThenByDescending(w => w.LastFocused)
-		.FirstOrDefault();
+	/// <summary>The window actions go to by default: the pinned one while it is open, else the focused one,
+	/// else the one focused most recently.</summary>
+	internal VsCodeWindow? ActiveWindow
+	{
+		get
+		{
+			var pinned = PinnedKey is { } key ? MostRecent(_windows.Values.Where(w => w.TargetKey == key)) : null;
+			return pinned ?? MostRecent(_windows.Values);
+		}
+	}
+
+	/// <summary>The workspace (or window) the user pinned. Kept while the pinned window is closed, so
+	/// reloading or reopening that workspace makes it the target again.</summary>
+	internal string? PinnedKey { get; private set; }
+
+	/// <summary>Whether <see cref="ActiveWindow"/> is the pinned window rather than the last focused one.</summary>
+	internal bool ActiveIsPinned => PinnedKey is { } key && ActiveWindow?.TargetKey == key;
+
+	/// <summary>Windows in a stable order for cycling and pickers: by workspace name, then by key.</summary>
+	internal IReadOnlyList<VsCodeWindow> OrderedWindows => [.. _windows.Values
+		.OrderBy(w => w.State.Workspace ?? "", StringComparer.OrdinalIgnoreCase)
+		.ThenBy(w => w.TargetKey, StringComparer.Ordinal)];
 
 	/// <summary>A window connected, disconnected or reported new state.</summary>
 	internal event Action? Changed;
@@ -120,12 +143,89 @@ public sealed class BridgeServer : IAsyncDisposable
 		}
 	}
 
-	/// <summary>Sends a request to <see cref="ActiveWindow"/>.</summary>
-	/// <exception cref="BridgeRequestException">No window is connected, or the request failed.</exception>
-	internal Task<JsonNode?> RequestAsync(string method, JsonObject? parameters, CancellationToken cancellationToken)
-		=> ActiveWindow is { } window
-			? window.RequestAsync(method, parameters, cancellationToken)
-			: throw new BridgeRequestException(BridgeFailure.NoWindow, null);
+	/// <summary>Pins the window or workspace with this key; <c>null</c> unpins.</summary>
+	internal void Pin(string? key)
+	{
+		PinnedKey = key;
+		_logger.Information(key is null ? "Unpinned; following the last focused VS Code window" : "Pinned VS Code target {Key}", key);
+		RaiseChanged();
+	}
+
+	/// <summary>Pins the window after the current target, wrapping around; returns it, or <c>null</c> with
+	/// no window connected.</summary>
+	internal VsCodeWindow? PinNext()
+	{
+		var windows = OrderedWindows;
+		if (windows.Count == 0)
+		{
+			return null;
+		}
+
+		var current = ActiveWindow;
+		var index = current is null ? -1 : windows.ToList().FindIndex(w => w.Id == current.Id);
+		var next = windows[(index + 1) % windows.Count];
+		Pin(next.TargetKey);
+		return next;
+	}
+
+	/// <summary>The windows a button with this target setting acts on: <see cref="TargetActive"/> or empty
+	/// for <see cref="ActiveWindow"/>, <see cref="TargetAll"/> for every window, otherwise the open window(s)
+	/// of that workspace, matched by key or, for a typed value, by workspace name.</summary>
+	internal IReadOnlyList<VsCodeWindow> ResolveTargets(string? target)
+	{
+		var value = target?.Trim();
+		if (string.IsNullOrEmpty(value) || value == TargetActive)
+		{
+			return ActiveWindow is { } active ? [active] : [];
+		}
+
+		if (value == TargetAll)
+		{
+			return OrderedWindows;
+		}
+
+		var byKey = _windows.Values.Where(w => w.TargetKey == value).ToList();
+		var matches = byKey.Count > 0
+			? byKey
+			: [.. _windows.Values.Where(w => string.Equals(w.State.Workspace, value, StringComparison.OrdinalIgnoreCase))];
+		return MostRecent(matches) is { } window ? [window] : [];
+	}
+
+	/// <summary>Sends a request to the window(s) <paramref name="target"/> resolves to (see
+	/// <see cref="ResolveTargets"/>). With several windows it answers with the first window's result and
+	/// fails if any window failed.</summary>
+	/// <exception cref="BridgeRequestException">No matching window is connected, or the request failed.</exception>
+	internal async Task<JsonNode?> RequestAsync(string method, JsonObject? parameters, CancellationToken cancellationToken,
+		string? target = null)
+	{
+		var windows = ResolveTargets(target);
+		if (windows.Count == 0)
+		{
+			// A named workspace that is not open says so, by name; otherwise nothing is connected at all.
+			var named = target?.Trim() is { Length: > 0 } t && t != TargetActive && t != TargetAll ? t : null;
+			throw new BridgeRequestException(BridgeFailure.NoWindow, named is null ? null : FriendlyName(named));
+		}
+
+		if (windows.Count == 1)
+		{
+			return await windows[0].RequestAsync(method, parameters, cancellationToken);
+		}
+
+		var requests = windows.Select(w => w.RequestAsync(method, (JsonObject?)parameters?.DeepClone(), cancellationToken)).ToList();
+		try
+		{
+			await Task.WhenAll(requests);
+		}
+		catch (BridgeRequestException)
+		{
+			// Reported below from the first window that failed, in a stable order.
+		}
+
+		var failed = requests.FirstOrDefault(r => r.IsFaulted);
+		return failed is not null
+			? throw failed.Exception!.InnerException ?? failed.Exception
+			: await requests[0];
+	}
 
 	public async ValueTask DisposeAsync() => await StopAsync();
 
@@ -149,6 +249,7 @@ public sealed class BridgeServer : IAsyncDisposable
 		_stopping.Dispose();
 		_stopping = null;
 		_windows.Clear();
+		_lastTarget = null;
 		Changed?.Invoke();
 	}
 
@@ -269,8 +370,19 @@ public sealed class BridgeServer : IAsyncDisposable
 		}
 
 		using var window = new VsCodeWindow(windowId, socket, _logger);
-		window.StateChanged += _ => Changed?.Invoke();
+		window.StateChanged += _ => RaiseChanged();
 		window.EventReceived += (w, name, data) => EventReceived?.Invoke(w, name, data);
+		window.PinRequested += (w, pinned) =>
+		{
+			if (pinned)
+			{
+				Pin(w.TargetKey);
+			}
+			else if (PinnedKey == w.TargetKey)
+			{
+				Pin(null);
+			}
+		};
 
 		if (_windows.TryRemove(windowId, out var replaced))
 		{
@@ -279,7 +391,8 @@ public sealed class BridgeServer : IAsyncDisposable
 
 		_windows[windowId] = window;
 		_logger.Information("VS Code window {WindowId} connected", windowId);
-		Changed?.Invoke();
+		_lastTarget = null;   // a new window needs to hear the current target too
+		RaiseChanged();
 
 		try
 		{
@@ -289,7 +402,66 @@ public sealed class BridgeServer : IAsyncDisposable
 		{
 			_windows.TryRemove(new KeyValuePair<string, VsCodeWindow>(windowId, window));
 			_logger.Information("VS Code window {WindowId} disconnected", windowId);
-			Changed?.Invoke();
+			RaiseChanged();
+		}
+	}
+
+	/// <summary>The last path segment of a workspace key (<c>.../MacroDeck3</c> → <c>MacroDeck3</c>), or
+	/// the value itself when it is already a name.</summary>
+	internal static string FriendlyName(string target)
+	{
+		var trimmed = target.TrimEnd('/');
+		var slash = trimmed.LastIndexOf('/');
+		var name = slash >= 0 ? Uri.UnescapeDataString(trimmed[(slash + 1)..]) : trimmed;
+		return name.EndsWith(".code-workspace", StringComparison.OrdinalIgnoreCase) ? name[..^".code-workspace".Length] : name;
+	}
+
+	private static VsCodeWindow? MostRecent(IEnumerable<VsCodeWindow> windows) => windows
+		.OrderByDescending(w => w.State.Focused)
+		.ThenByDescending(w => w.LastFocused)
+		.FirstOrDefault();
+
+	/// <summary>Raises <see cref="Changed"/> and, when the target moved, tells every window, so each status
+	/// bar can show whether Macro Deck controls it.</summary>
+	private void RaiseChanged()
+	{
+		Changed?.Invoke();
+
+		var active = ActiveWindow;
+		var target = (active?.Id, ActiveIsPinned);
+		lock (_targetLock)
+		{
+			if (_lastTarget == target)
+			{
+				return;
+			}
+
+			_lastTarget = target;
+		}
+
+		var message = new JsonObject
+		{
+			["type"] = "target",
+			["windowId"] = active?.Id,
+			["workspace"] = active?.State.Workspace,
+			["pinned"] = ActiveIsPinned
+		};
+		foreach (var window in _windows.Values)
+		{
+			_ = SendQuietlyAsync(window, (JsonObject)message.DeepClone());
+		}
+	}
+
+	private static async Task SendQuietlyAsync(VsCodeWindow window, JsonObject message)
+	{
+		try
+		{
+			using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+			await window.SendAsync(message, timeout.Token);
+		}
+		catch (Exception ex) when (ex is WebSocketException or OperationCanceledException or ObjectDisposedException or InvalidOperationException)
+		{
+			// The window is going away; its disconnect recomputes the target for the rest.
 		}
 	}
 
