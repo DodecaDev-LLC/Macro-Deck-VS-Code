@@ -47,7 +47,7 @@
       },
       {
         "command": "macroDeckBridge.unpinWindow",
-        "title": "Follow the Focused Window",
+        "title": "Unpin Window and Follow the Focused One",
         "category": "Macro Deck"
       },
       {
