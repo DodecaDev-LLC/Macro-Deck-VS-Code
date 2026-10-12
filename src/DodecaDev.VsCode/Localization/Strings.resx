@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!-- The default-language file. Every translation is checked against it and the fallback chain ends
+       here, so it is required even for a plugin that ships one language. Add a language by adding
+       Localization/Strings.<culture>.resx beside it (Strings.de.resx, Strings.pt-BR.resx).
+       A dotted key becomes a nested class: Actions.LogMessage.Name is Strings.Actions.LogMessage.Name(). -->
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Actions.LogMessage.Name" xml:space="preserve">
+    <value>Write log message</value>
+  </data>
+  <data name="Actions.LogMessage.Description" xml:space="preserve">
+    <value>Writes a message to the Macro Deck log.</value>
+  </data>
+  <data name="Actions.LogMessage.Message.Label" xml:space="preserve">
+    <value>Message</value>
+  </data>
+  <data name="Actions.LogMessage.Message.Description" xml:space="preserve">
+    <value>The text to write to the log.</value>
+  </data>
+  <data name="Actions.LogMessage.Message.Placeholder" xml:space="preserve">
+    <value>Hello from my plugin</value>
+  </data>
+</root>

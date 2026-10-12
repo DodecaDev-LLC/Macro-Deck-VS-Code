@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/solution/">
+    <File Path="AGENTS.md" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/DodecaDev.VsCode/DodecaDev.VsCode.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DodecaDev.VsCode.Tests/DodecaDev.VsCode.Tests.csproj" />
+  </Folder>
+</Solution>
