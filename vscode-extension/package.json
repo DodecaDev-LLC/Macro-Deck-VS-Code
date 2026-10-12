@@ -5,9 +5,18 @@
   "version": "1.0.0",
   "publisher": "dodecadev",
   "license": "MIT",
+  "icon": "images/icon.png",
+  "galleryBanner": {
+    "color": "#1E1E1E",
+    "theme": "dark"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/DodecaDev-LLC/Macro-Deck-VS-Code"
+  },
+  "homepage": "https://github.com/DodecaDev-LLC/Macro-Deck-VS-Code#readme",
+  "bugs": {
+    "url": "https://github.com/DodecaDev-LLC/Macro-Deck-VS-Code/issues"
   },
   "engines": {
     "vscode": "^1.95.0"

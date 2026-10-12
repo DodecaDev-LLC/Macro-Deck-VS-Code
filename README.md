@@ -84,6 +84,13 @@ keep the HMAC test vector in `BridgeAuthTests` and `vscode-extension/test/bridge
 Publishing a GitHub release (tag `v1.2.3`) does both halves at once: the plugin goes to the Creator
 Portal for review, and the matching `macro-deck-bridge-1.2.3.vsix` is attached to the release.
 
+## Icon
+
+`macro-deck-plugin/src/DodecaDev.VsCode/Assets/icon.svg` is the source. `vscode-extension/images/icon.png` is
+a 256 px render of it, because the VS Code Marketplace rejects SVG icons: re-render it when the SVG
+changes. The icon is a macro pad whose keys are what the plugin does, deliberately without the VS Code or
+Macro Deck logos, which are their owners' trademarks.
+
 ## License
 
 MIT, see [LICENSE](LICENSE).
