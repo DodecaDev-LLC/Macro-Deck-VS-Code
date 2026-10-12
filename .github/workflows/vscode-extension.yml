@@ -1,0 +1,87 @@
+# Builds, tests and packages the Macro Deck Bridge extension (vscode-extension/).
+#
+# - Pull requests and merges to main: the .vsix is a workflow artifact.
+# - A published GitHub release: the .vsix takes its version from the release tag (v1.2.3 or 1.2.3) and
+#   is attached to the release, so the plugin and the extension of one release share a version.
+#
+# One .vsix serves every platform: the extension is a single bundled JavaScript file with no native code.
+name: VS Code extension
+
+on:
+  push:
+    branches: [main]
+    paths: ['vscode-extension/**', '.github/workflows/vscode-extension.yml']
+  pull_request:
+    paths: ['vscode-extension/**', '.github/workflows/vscode-extension.yml']
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: vscode-extension
+    outputs:
+      vsix: ${{ steps.package.outputs.vsix }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: vscode-extension/package-lock.json
+
+      - run: npm ci
+
+      - name: Take the version from the release tag
+        if: github.event_name == 'release'
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          version="${TAG#v}"
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Release tag '$TAG' is not a version like v1.2.3; the VS Code Marketplace accepts only major.minor.patch."
+            exit 1
+          fi
+          npm version "$version" --no-git-tag-version --allow-same-version
+
+      - run: npm test
+
+      - name: Package
+        id: package
+        run: |
+          vsix="macro-deck-bridge-$(node -p "require('./package.json').version").vsix"
+          mkdir -p ../artifacts
+          npx vsce package --out "../artifacts/$vsix"
+          echo "vsix=$vsix" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: vsix
+          path: artifacts/*.vsix
+          if-no-files-found: error
+
+  attach-to-release:
+    if: github.event_name == 'release'
+    needs: build
+    runs-on: ubuntu-latest
+    # Only this job can write, and it runs no third-party code: npm install and the build stay read-only.
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: vsix
+
+      - name: Attach the .vsix to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+          VSIX: ${{ needs.build.outputs.vsix }}
+        run: gh release upload "$TAG" "$VSIX" --clobber --repo "$GITHUB_REPOSITORY"
