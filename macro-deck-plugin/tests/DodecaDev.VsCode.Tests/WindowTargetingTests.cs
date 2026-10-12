@@ -42,6 +42,22 @@ public sealed class WindowTargetingTests
 	[TearDown]
 	public async Task TearDownAsync() => await _harness.DisposeAsync();
 
+	private Task<CapabilityInvocationOutcome> Run(string command, string? window = null)
+		=> _harness.Actions.ExecuteAsync("run-command",
+			new Dictionary<string, object?> { ["command"] = command, ["window"] = window });
+
+	private async Task<List<string?>> WindowValuesAsync()
+		=> [.. (await _harness.Actions.GetOptionsAsync("run-command", "window")).Data!.Value.GetProperty("options")
+			.EnumerateArray().Select(o => o.GetProperty("value").GetString())];
+
+	/// <summary>A request to this window, answered by it: every message it sent before is now applied.</summary>
+	private async Task SyncAsync(FakeVsCodeWindow window, string key)
+	{
+		var execution = Run("noop", key);
+		await window.AnswerNextRequestAsync();
+		Assert.That((await execution).Succeeded, Is.True);
+	}
+
 	/// <summary>Connects a window and waits until the plugin has applied its state report.</summary>
 	private async Task<FakeVsCodeWindow> OpenAsync(string windowId, string key, string name, bool focused)
 	{
@@ -60,22 +76,6 @@ public sealed class WindowTargetingTests
 
 		return window;
 	}
-
-	private async Task<List<string?>> WindowValuesAsync()
-		=> [.. (await _harness.Actions.GetOptionsAsync("run-command", "window")).Data!.Value.GetProperty("options")
-			.EnumerateArray().Select(o => o.GetProperty("value").GetString())];
-
-	/// <summary>A request to this window, answered by it: every message it sent before is now applied.</summary>
-	private async Task SyncAsync(FakeVsCodeWindow window, string key)
-	{
-		var execution = Run("noop", key);
-		await window.AnswerNextRequestAsync();
-		Assert.That((await execution).Succeeded, Is.True);
-	}
-
-	private Task<CapabilityInvocationOutcome> Run(string command, string? window = null)
-		=> _harness.Actions.ExecuteAsync("run-command",
-			new Dictionary<string, object?> { ["command"] = command, ["window"] = window });
 
 	private async Task<string?> SelectButtonStateAsync()
 		=> (await _harness.Actions.GetActionStateAsync("select-window")).Data!.Value.GetProperty("activeStateId").GetString();

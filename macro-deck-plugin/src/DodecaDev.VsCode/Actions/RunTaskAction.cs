@@ -48,8 +48,6 @@ internal sealed class RunTaskAction(BridgeServer bridge) : IDynamicOptionsAction
 		}
 	}
 
-	public IActionExecutor CreateExecutor() => new Executor(bridge);
-
 	private sealed class Executor(BridgeServer bridge) : IActionExecutor
 	{
 		public async Task<ActionResult> ExecuteAsync(ActionExecutionContext context)
@@ -74,4 +72,6 @@ internal sealed class RunTaskAction(BridgeServer bridge) : IDynamicOptionsAction
 			}
 		}
 	}
+
+	public IActionExecutor CreateExecutor() => new Executor(bridge);
 }

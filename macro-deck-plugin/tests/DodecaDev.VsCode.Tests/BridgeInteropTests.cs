@@ -31,6 +31,9 @@ public sealed class BridgeInteropTests
 {
 	private const string Token = "interop-pairing-token-0123456789";
 
+	private static async Task<string?> ReadWorkspaceAsync(PluginTestHarness harness)
+		=> (await harness.Variables.GetAsync("workspace")).DataAs<VariableReadingDto>()?.Value.Text;
+
 	[Test]
 	public async Task The_typescript_client_pairs_reports_state_and_runs_a_command()
 	{
@@ -82,7 +85,4 @@ public sealed class BridgeInteropTests
 			node.Kill();
 		}
 	}
-
-	private static async Task<string?> ReadWorkspaceAsync(PluginTestHarness harness)
-		=> (await harness.Variables.GetAsync("workspace")).DataAs<VariableReadingDto>()?.Value.Text;
 }

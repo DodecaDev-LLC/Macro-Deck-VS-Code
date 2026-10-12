@@ -10,3 +10,8 @@ This repository has two halves:
 The two share a wire protocol: change both together, and keep the HMAC test vector in
 `macro-deck-plugin/tests/DodecaDev.VsCode.Tests/BridgeInteropTests.cs` and
 `vscode-extension/test/bridge.test.js` in step. See [README.md](README.md) for how they fit together.
+
+**Order of declarations (both halves):** declare a member before the members that use it, so a file reads
+top-down without forward references. In C#: nested types and constants, fields, properties, the
+constructor, then each helper method above its callers. In TypeScript: module state, then helpers above
+the functions that call them, with `activate`/`deactivate` last.

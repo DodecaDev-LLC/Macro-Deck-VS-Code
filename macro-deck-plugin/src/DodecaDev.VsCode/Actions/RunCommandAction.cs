@@ -35,6 +35,28 @@ internal sealed class RunCommandAction(BridgeServer bridge) : IDynamicOptionsAct
 		WindowTarget.Parameter()
 	];
 
+	/// <summary>Blank means no arguments, a JSON array is spread over the command's parameters, and any
+	/// other JSON value is passed as its single argument.</summary>
+	internal static bool TryParseArguments(string? text, out JsonArray arguments)
+	{
+		arguments = [];
+		if (string.IsNullOrWhiteSpace(text))
+		{
+			return true;
+		}
+
+		try
+		{
+			var node = JsonNode.Parse(text);
+			arguments = node as JsonArray ?? [node];
+			return true;
+		}
+		catch (JsonException)
+		{
+			return false;
+		}
+	}
+
 	public async Task<DynamicOptionsResult> GetDynamicOptionsAsync(DynamicOptionsContext context, CancellationToken cancellationToken)
 	{
 		if (context.ParameterName == WindowTarget.ParameterName)
@@ -55,8 +77,6 @@ internal sealed class RunCommandAction(BridgeServer bridge) : IDynamicOptionsAct
 			return new DynamicOptionsResult { Options = [], Error = BridgeResults.Message(ex), AllowsCustomValue = true };
 		}
 	}
-
-	public IActionExecutor CreateExecutor() => new Executor(bridge);
 
 	private sealed class Executor(BridgeServer bridge) : IActionExecutor
 	{
@@ -87,25 +107,5 @@ internal sealed class RunCommandAction(BridgeServer bridge) : IDynamicOptionsAct
 		}
 	}
 
-	/// <summary>Blank means no arguments, a JSON array is spread over the command's parameters, and any
-	/// other JSON value is passed as its single argument.</summary>
-	internal static bool TryParseArguments(string? text, out JsonArray arguments)
-	{
-		arguments = [];
-		if (string.IsNullOrWhiteSpace(text))
-		{
-			return true;
-		}
-
-		try
-		{
-			var node = JsonNode.Parse(text);
-			arguments = node as JsonArray ?? [node];
-			return true;
-		}
-		catch (JsonException)
-		{
-			return false;
-		}
-	}
+	public IActionExecutor CreateExecutor() => new Executor(bridge);
 }

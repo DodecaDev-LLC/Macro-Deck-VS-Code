@@ -15,11 +15,24 @@ namespace DodecaDev.VsCode;
 
 /// <summary>
 /// The VS Code integration. Every capability reads the same <see cref="BridgeServer"/>: actions go to the
-/// active window, variables report what that window last said, and events are forwarded from any window.
+/// window each button targets, variables report on the default window, and events are forwarded from any window.
 /// </summary>
 public sealed class PluginIntegration : IPluginIntegration, IVariableProvider, IEventProvider,
 	IConfigFlowProvider, IIntegrationIssueProvider
 {
+	/// <summary>Values of <c>vscode_bridge_status</c>: where the bridge got to, readable in Macro Deck
+	/// without any log access. Stable machine values, so buttons and conditions can test them.</summary>
+	internal static class BridgeStatus
+	{
+		internal const string NotStarted = "not-started";
+		internal const string ReadingConfig = "reading-config";
+		internal const string NotConfigured = "not-configured";
+		internal const string StartingListener = "starting-listener";
+		internal const string Listening = "listening";
+		internal const string PortInUse = "port-in-use";
+		internal const string Error = "error";
+	}
+
 	internal const string PortInUseIssueId = "port-in-use";
 
 	/// <summary>Events the extension may send, with the payload keys forwarded for each. Anything else
@@ -38,100 +51,9 @@ public sealed class PluginIntegration : IPluginIntegration, IVariableProvider, I
 	private IIntegrationContext? _context;
 	private string _status = BridgeStatus.NotStarted;
 
-	public PluginIntegration(BridgeServer bridge, ILogger logger)
-	{
-		_bridge = bridge;
-		_logger = logger.ForContext<PluginIntegration>();
-		Actions = [new RunCommandAction(bridge), new RunTaskAction(bridge), new SelectWindowAction(bridge)];
-	}
+	// ---- Capabilities the host reads ----------------------------------------------------------------
 
 	public IReadOnlyList<IActionDefinition> Actions { get; }
-
-	public async Task InitializeAsync(IIntegrationContext context)
-	{
-		_context = context;
-
-		// InitializeAsync runs again after reconnects and config changes.
-		_bridge.EventReceived -= OnBridgeEvent;
-		_bridge.EventReceived += OnBridgeEvent;
-
-		try
-		{
-			_status = BridgeStatus.ReadingConfig;
-			var entries = await context.Config.GetEntriesAsync();
-			var entry = entries.Count > 0 ? entries[0] : null;
-			if (entry is null)
-			{
-				_status = BridgeStatus.NotConfigured;
-				_logger.Information("Not set up yet; the bridge starts once the pairing token is entered");
-				await _bridge.StopAsync();
-				return;
-			}
-
-			var token = await context.Config.GetSecretAsync(entry.Id, PairingConfigFlow.TokenField);
-			var port = await ReadPortAsync(context, entry.Id);
-
-			if (string.IsNullOrWhiteSpace(token))
-			{
-				_status = BridgeStatus.NotConfigured;
-				_logger.Warning("No pairing token is stored; waiting for setup");
-				await _bridge.StopAsync();
-				return;
-			}
-
-			_status = BridgeStatus.StartingListener;
-			using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-			await _bridge.StartAsync(port, token.Trim(), timeout.Token);
-			_status = _bridge.PortInUse ? BridgeStatus.PortInUse : BridgeStatus.Listening;
-		}
-		catch (Exception ex)
-		{
-			_status = BridgeStatus.Error;
-			_logger.Error(ex, "The VS Code bridge could not start");
-			throw;
-		}
-	}
-
-	/// <summary>The setup stores the port from a Number field, which the host may keep as a JSON number;
-	/// <c>GetStringAsync</c> only deserializes JSON strings and throws on anything else, so a numeric
-	/// value must not stop the bridge from starting.</summary>
-	private async Task<int> ReadPortAsync(IIntegrationContext context, Guid entryId)
-	{
-		string? text;
-		try
-		{
-			text = await context.Config.GetStringAsync(entryId, PairingConfigFlow.PortField);
-		}
-		catch (System.Text.Json.JsonException ex)
-		{
-			_logger.Warning(ex, "The stored port is not text; using the default port {Port}", BridgeServer.DefaultPort);
-			return BridgeServer.DefaultPort;
-		}
-
-		return PairingConfigFlow.TryParsePort(text, out var port) ? port : BridgeServer.DefaultPort;
-	}
-
-	public async Task ShutdownAsync()
-	{
-		_bridge.EventReceived -= OnBridgeEvent;
-		_context = null;
-		await _bridge.StopAsync();
-	}
-
-	/// <summary>Values of <c>vscode_bridge_status</c>: where the bridge got to, readable in Macro Deck
-	/// without any log access. Stable machine values, so buttons and conditions can test them.</summary>
-	internal static class BridgeStatus
-	{
-		internal const string NotStarted = "not-started";
-		internal const string ReadingConfig = "reading-config";
-		internal const string NotConfigured = "not-configured";
-		internal const string StartingListener = "starting-listener";
-		internal const string Listening = "listening";
-		internal const string PortInUse = "port-in-use";
-		internal const string Error = "error";
-	}
-
-	// ---- Variables -------------------------------------------------------------------------------
 
 	public IReadOnlyList<VariableDefinition> Variables { get; } =
 	[
@@ -160,36 +82,6 @@ public sealed class PluginIntegration : IPluginIntegration, IVariableProvider, I
 		VariableDefinition.Eager("vscode_debugging", VariableType.Boolean) with
 			{ Id = "debugging", DisplayName = Strings.Variables.Debugging() }
 	];
-
-	/// <summary>Answers from the state the windows last pushed; never touches the socket.</summary>
-	public ValueTask<VariableReading> ReadAsync(string localId, CancellationToken cancellationToken = default)
-	{
-		var window = _bridge.ActiveWindow;
-		var state = window?.State;
-
-		return ValueTask.FromResult(localId switch
-		{
-			"bridge-status" => VariableReading.Of(_status),
-			"connected" => VariableReading.Of(window is not null),
-			"window-count" => VariableReading.Of(_bridge.Windows.Count),
-			"target-pinned" => VariableReading.Of(_bridge.ActiveIsPinned),
-			_ when state is null => VariableReading.Unavailable,
-			"workspace" => TextOrUnavailable(state.Workspace),
-			"active-file" => TextOrUnavailable(state.ActiveFile),
-			"language" => TextOrUnavailable(state.Language),
-			"git-branch" => TextOrUnavailable(state.GitBranch),
-			"errors" => VariableReading.Of(state.Errors),
-			"warnings" => VariableReading.Of(state.Warnings),
-			"unsaved-files" => VariableReading.Of(state.UnsavedFiles),
-			"debugging" => VariableReading.Of(state.Debugging),
-			_ => VariableReading.Unavailable
-		});
-	}
-
-	private static VariableReading TextOrUnavailable(string? value)
-		=> string.IsNullOrEmpty(value) ? VariableReading.Unavailable : VariableReading.Of(value);
-
-	// ---- Events ----------------------------------------------------------------------------------
 
 	public IReadOnlyList<EventDefinition> EventDefinitions { get; } =
 	[
@@ -236,6 +128,36 @@ public sealed class PluginIntegration : IPluginIntegration, IVariableProvider, I
 		}
 	];
 
+	public bool AllowsMultipleConfigurations => false;
+
+	public PluginIntegration(BridgeServer bridge, ILogger logger)
+	{
+		_bridge = bridge;
+		_logger = logger.ForContext<PluginIntegration>();
+		Actions = [new RunCommandAction(bridge), new RunTaskAction(bridge), new SelectWindowAction(bridge)];
+	}
+
+	// ---- Lifecycle ---------------------------------------------------------------------------------
+
+	/// <summary>Entries saved while the Port field was a Number field hold a JSON number, and
+	/// <c>GetStringAsync</c> only deserializes JSON strings, so such a value falls back to the default port
+	/// instead of stopping the bridge from starting.</summary>
+	private async Task<int> ReadPortAsync(IIntegrationContext context, Guid entryId)
+	{
+		string? text;
+		try
+		{
+			text = await context.Config.GetStringAsync(entryId, PairingConfigFlow.PortField);
+		}
+		catch (System.Text.Json.JsonException ex)
+		{
+			_logger.Warning(ex, "The stored port is not text; using the default port {Port}", BridgeServer.DefaultPort);
+			return BridgeServer.DefaultPort;
+		}
+
+		return PairingConfigFlow.TryParsePort(text, out var port) ? port : BridgeServer.DefaultPort;
+	}
+
 	private void OnBridgeEvent(VsCodeWindow window, string name, JsonObject? data)
 	{
 		if (!ForwardedEvents.TryGetValue(name, out var keys))
@@ -260,11 +182,91 @@ public sealed class PluginIntegration : IPluginIntegration, IVariableProvider, I
 		_context?.Events.Publish(name, payload);
 	}
 
+	public async Task InitializeAsync(IIntegrationContext context)
+	{
+		_context = context;
+
+		// InitializeAsync runs again after reconnects and config changes.
+		_bridge.EventReceived -= OnBridgeEvent;
+		_bridge.EventReceived += OnBridgeEvent;
+
+		try
+		{
+			_status = BridgeStatus.ReadingConfig;
+			var entries = await context.Config.GetEntriesAsync();
+			var entry = entries.Count > 0 ? entries[0] : null;
+			if (entry is null)
+			{
+				_status = BridgeStatus.NotConfigured;
+				_logger.Information("Not set up yet; the bridge starts once the pairing token is entered");
+				await _bridge.StopAsync();
+				return;
+			}
+
+			var token = await context.Config.GetSecretAsync(entry.Id, PairingConfigFlow.TokenField);
+			var port = await ReadPortAsync(context, entry.Id);
+
+			if (string.IsNullOrWhiteSpace(token))
+			{
+				_status = BridgeStatus.NotConfigured;
+				_logger.Warning("No pairing token is stored; waiting for setup");
+				await _bridge.StopAsync();
+				return;
+			}
+
+			_status = BridgeStatus.StartingListener;
+			using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+			await _bridge.StartAsync(port, token.Trim(), timeout.Token);
+			_status = _bridge.PortInUse ? BridgeStatus.PortInUse : BridgeStatus.Listening;
+		}
+		catch (Exception ex)
+		{
+			_status = BridgeStatus.Error;
+			_logger.Error(ex, "The VS Code bridge could not start");
+			throw;
+		}
+	}
+
+	public async Task ShutdownAsync()
+	{
+		_bridge.EventReceived -= OnBridgeEvent;
+		_context = null;
+		await _bridge.StopAsync();
+	}
+
+	// ---- Variables -------------------------------------------------------------------------------
+
+	private static VariableReading TextOrUnavailable(string? value)
+		=> string.IsNullOrEmpty(value) ? VariableReading.Unavailable : VariableReading.Of(value);
+
+	/// <summary>Answers from the state the windows last pushed; never touches the socket.</summary>
+	public ValueTask<VariableReading> ReadAsync(string localId, CancellationToken cancellationToken = default)
+	{
+		var window = _bridge.ActiveWindow;
+		var state = window?.State;
+
+		return ValueTask.FromResult(localId switch
+		{
+			"bridge-status" => VariableReading.Of(_status),
+			"connected" => VariableReading.Of(window is not null),
+			"window-count" => VariableReading.Of(_bridge.Windows.Count),
+			"target-pinned" => VariableReading.Of(_bridge.ActiveIsPinned),
+			_ when state is null => VariableReading.Unavailable,
+			"workspace" => TextOrUnavailable(state.Workspace),
+			"active-file" => TextOrUnavailable(state.ActiveFile),
+			"language" => TextOrUnavailable(state.Language),
+			"git-branch" => TextOrUnavailable(state.GitBranch),
+			"errors" => VariableReading.Of(state.Errors),
+			"warnings" => VariableReading.Of(state.Warnings),
+			"unsaved-files" => VariableReading.Of(state.UnsavedFiles),
+			"debugging" => VariableReading.Of(state.Debugging),
+			_ => VariableReading.Unavailable
+		});
+	}
+
 	// ---- Setup and issues ------------------------------------------------------------------------
 
 	public IConfigFlow CreateConfigFlow() => new PairingConfigFlow();
-
-	public bool AllowsMultipleConfigurations => false;
 
 	public Task<IReadOnlyList<IntegrationIssue>> GetIssuesAsync(CancellationToken cancellationToken = default)
 	{

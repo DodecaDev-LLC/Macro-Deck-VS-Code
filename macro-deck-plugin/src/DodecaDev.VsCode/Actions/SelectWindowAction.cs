@@ -65,24 +65,9 @@ internal sealed class SelectWindowAction(BridgeServer bridge) : IDynamicOptionsA
 	public Task<DynamicOptionsResult> GetDynamicOptionsAsync(DynamicOptionsContext context, CancellationToken cancellationToken)
 		=> Task.FromResult(WindowTarget.Options(bridge, context.Filter, allowAll: false));
 
-	public IActionExecutor CreateExecutor() => new Executor(bridge);
-
 	private sealed class Executor(BridgeServer bridge) : IActionExecutor
 	{
-		public Task<ActionResult> ExecuteAsync(ActionExecutionContext context)
-		{
-			var mode = context.Parameters.GetValueOrDefault(ModeParameter)?.ToString() is { Length: > 0 } m ? m : ToggleMode;
-			return Task.FromResult(mode switch
-			{
-				ToggleMode when bridge.ActiveIsPinned => Unpin(),
-				ToggleMode => PinActive(),
-				NextMode => bridge.PinNext() is null ? NoWindow() : ActionResult.Success(PinnedState),
-				PinMode => PinChosen(WindowTarget.Read(context.Parameters)),
-				UnpinMode => Unpin(),
-				_ => ActionResult.Failed(ActionErrorCodes.InvalidParameter,
-					MacroDeckStrings.Validation.Required(Strings.Actions.SelectWindow.Mode.Label()))
-			});
-		}
+		private static ActionResult NoWindow() => ActionResult.Failed(ActionErrorCodes.NotConnected, Strings.Errors.NoWindow());
 
 		private ActionResult PinActive()
 		{
@@ -127,6 +112,21 @@ internal sealed class SelectWindowAction(BridgeServer bridge) : IDynamicOptionsA
 			return ActionResult.Success(bridge.ActiveWindow is null ? UnavailableState : FollowingState);
 		}
 
-		private static ActionResult NoWindow() => ActionResult.Failed(ActionErrorCodes.NotConnected, Strings.Errors.NoWindow());
+		public Task<ActionResult> ExecuteAsync(ActionExecutionContext context)
+		{
+			var mode = context.Parameters.GetValueOrDefault(ModeParameter)?.ToString() is { Length: > 0 } m ? m : ToggleMode;
+			return Task.FromResult(mode switch
+			{
+				ToggleMode when bridge.ActiveIsPinned => Unpin(),
+				ToggleMode => PinActive(),
+				NextMode => bridge.PinNext() is null ? NoWindow() : ActionResult.Success(PinnedState),
+				PinMode => PinChosen(WindowTarget.Read(context.Parameters)),
+				UnpinMode => Unpin(),
+				_ => ActionResult.Failed(ActionErrorCodes.InvalidParameter,
+					MacroDeckStrings.Validation.Required(Strings.Actions.SelectWindow.Mode.Label()))
+			});
+		}
 	}
+
+	public IActionExecutor CreateExecutor() => new Executor(bridge);
 }

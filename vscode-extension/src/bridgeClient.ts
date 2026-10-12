@@ -49,21 +49,6 @@ export class BridgeClient {
 
 	constructor(private readonly options: BridgeClientOptions) {}
 
-	start(): void {
-		this.stopped = false;
-		this.connect();
-	}
-
-	stop(): void {
-		this.stopped = true;
-		clearTimeout(this.retryTimer);
-		this.socket?.removeAllListeners();
-		this.socket?.on("error", () => {});
-		this.socket?.close(1000, "VS Code window closing");
-		this.socket = undefined;
-		this.authenticated = false;
-	}
-
 	get connected(): boolean {
 		return this.authenticated;
 	}
@@ -73,6 +58,41 @@ export class BridgeClient {
 		if (this.authenticated && this.socket?.readyState === WebSocket.OPEN) {
 			this.socket.send(JSON.stringify(message));
 		}
+	}
+
+	private async answer(socket: WebSocket, message: Record<string, unknown>): Promise<void> {
+		const id = message.id;
+		const params = (message.params ?? {}) as Record<string, unknown>;
+		let reply: Record<string, unknown>;
+		try {
+			const result = await this.options.onRequest(String(message.method), params);
+			reply = { type: "response", id, ok: true, result: result ?? null };
+		} catch (error) {
+			reply = { type: "response", id, ok: false, error: { message: error instanceof Error ? error.message : String(error) } };
+		}
+
+		if (socket.readyState === WebSocket.OPEN) {
+			socket.send(JSON.stringify(reply));
+		}
+	}
+
+	private scheduleRetry(delayMs?: number): void {
+		if (this.stopped) {
+			return;
+		}
+
+		clearTimeout(this.retryTimer);
+		const delay = delayMs ?? this.retryMs;
+		this.retryMs = Math.min(this.retryMs * 2, MAX_RETRY_MS);
+		this.retryTimer = setTimeout(() => this.connect(), delay);
+	}
+
+	private giveUp(socket: WebSocket, status: ConnectionStatus): void {
+		this.options.onStatus(status);
+		socket.removeAllListeners();
+		socket.on("error", () => {});
+		socket.terminate();
+		this.scheduleRetry(MAX_RETRY_MS);
 	}
 
 	private connect(): void {
@@ -159,38 +179,18 @@ export class BridgeClient {
 		socket.on("error", () => {});
 	}
 
-	private giveUp(socket: WebSocket, status: ConnectionStatus): void {
-		this.options.onStatus(status);
-		socket.removeAllListeners();
-		socket.on("error", () => {});
-		socket.terminate();
-		this.scheduleRetry(MAX_RETRY_MS);
+	start(): void {
+		this.stopped = false;
+		this.connect();
 	}
 
-	private scheduleRetry(delayMs?: number): void {
-		if (this.stopped) {
-			return;
-		}
-
+	stop(): void {
+		this.stopped = true;
 		clearTimeout(this.retryTimer);
-		const delay = delayMs ?? this.retryMs;
-		this.retryMs = Math.min(this.retryMs * 2, MAX_RETRY_MS);
-		this.retryTimer = setTimeout(() => this.connect(), delay);
-	}
-
-	private async answer(socket: WebSocket, message: Record<string, unknown>): Promise<void> {
-		const id = message.id;
-		const params = (message.params ?? {}) as Record<string, unknown>;
-		let reply: Record<string, unknown>;
-		try {
-			const result = await this.options.onRequest(String(message.method), params);
-			reply = { type: "response", id, ok: true, result: result ?? null };
-		} catch (error) {
-			reply = { type: "response", id, ok: false, error: { message: error instanceof Error ? error.message : String(error) } };
-		}
-
-		if (socket.readyState === WebSocket.OPEN) {
-			socket.send(JSON.stringify(reply));
-		}
+		this.socket?.removeAllListeners();
+		this.socket?.on("error", () => {});
+		this.socket?.close(1000, "VS Code window closing");
+		this.socket = undefined;
+		this.authenticated = false;
 	}
 }

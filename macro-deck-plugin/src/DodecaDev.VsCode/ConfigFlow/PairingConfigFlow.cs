@@ -18,41 +18,6 @@ internal sealed class PairingConfigFlow : IConfigFlow
 
 	private const string StepId = "pairing";
 
-	public Task<ConfigFlowResult> StartAsync(IConfigFlowContext context, CancellationToken cancellationToken)
-		=> Task.FromResult(ConfigFlowResult.Step(BuildStep()));
-
-	public Task<ConfigFlowResult> SubmitAsync(
-		string stepId,
-		IReadOnlyDictionary<string, object?> input,
-		IConfigFlowContext context,
-		CancellationToken cancellationToken)
-	{
-		if (!string.Equals(stepId, StepId, StringComparison.Ordinal))
-		{
-			return Task.FromResult(ConfigFlowResult.Error(BuildStep(), Strings.ConfigFlow.UnknownStep()));
-		}
-
-		if (!TryParsePort(input.GetValueOrDefault(PortField), out _))
-		{
-			var message = Strings.ConfigFlow.Port.Invalid();
-			return Task.FromResult(ConfigFlowResult.Error(BuildStep(), message,
-				new Dictionary<string, LocalizedText> { [PortField] = message }));
-		}
-
-		// Reconfiguring may leave the secret blank to keep the stored one; a new entry may not.
-		var isReconfigure = (context as IConfigFlowEntryContext)?.EntryTitle is not null;
-		var token = (input.GetValueOrDefault(TokenField) as string ?? "").Trim();
-		if (!isReconfigure && token.Length < 16)
-		{
-			var message = Strings.ConfigFlow.Token.Invalid();
-			return Task.FromResult(ConfigFlowResult.Error(BuildStep(), message,
-				new Dictionary<string, LocalizedText> { [TokenField] = message }));
-		}
-
-		// Deliberately a plain string: the host stores it as the entry's name, which the user can rename.
-		return Task.FromResult(ConfigFlowResult.Complete("VS Code"));
-	}
-
 	internal static bool TryParsePort(object? value, out int port)
 	{
 		port = 0;
@@ -93,4 +58,39 @@ internal sealed class PairingConfigFlow : IConfigFlow
 				required: true)
 		]
 	};
+
+	public Task<ConfigFlowResult> StartAsync(IConfigFlowContext context, CancellationToken cancellationToken)
+		=> Task.FromResult(ConfigFlowResult.Step(BuildStep()));
+
+	public Task<ConfigFlowResult> SubmitAsync(
+		string stepId,
+		IReadOnlyDictionary<string, object?> input,
+		IConfigFlowContext context,
+		CancellationToken cancellationToken)
+	{
+		if (!string.Equals(stepId, StepId, StringComparison.Ordinal))
+		{
+			return Task.FromResult(ConfigFlowResult.Error(BuildStep(), Strings.ConfigFlow.UnknownStep()));
+		}
+
+		if (!TryParsePort(input.GetValueOrDefault(PortField), out _))
+		{
+			var message = Strings.ConfigFlow.Port.Invalid();
+			return Task.FromResult(ConfigFlowResult.Error(BuildStep(), message,
+				new Dictionary<string, LocalizedText> { [PortField] = message }));
+		}
+
+		// Reconfiguring may leave the secret blank to keep the stored one; a new entry may not.
+		var isReconfigure = (context as IConfigFlowEntryContext)?.EntryTitle is not null;
+		var token = (input.GetValueOrDefault(TokenField) as string ?? "").Trim();
+		if (!isReconfigure && token.Length < 16)
+		{
+			var message = Strings.ConfigFlow.Token.Invalid();
+			return Task.FromResult(ConfigFlowResult.Error(BuildStep(), message,
+				new Dictionary<string, LocalizedText> { [TokenField] = message }));
+		}
+
+		// Deliberately a plain string: the host stores it as the entry's name, which the user can rename.
+		return Task.FromResult(ConfigFlowResult.Complete("VS Code"));
+	}
 }

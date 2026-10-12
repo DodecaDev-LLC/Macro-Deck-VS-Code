@@ -22,11 +22,39 @@ internal sealed class FakeVsCodeWindow : IAsyncDisposable
 	/// <summary>Every "target" notice the plugin sent, oldest first: which window it controls now.</summary>
 	internal List<JsonObject> TargetNotices { get; } = [];
 
+	private static CancellationToken Timeout() => new CancellationTokenSource(TimeSpan.FromSeconds(5)).Token;
+
 	internal static int FreePort()
 	{
 		using var listener = new TcpListener(IPAddress.Loopback, 0);
 		listener.Start();
 		return ((IPEndPoint)listener.LocalEndpoint).Port;
+	}
+
+	internal static string Proof(string token, string role, string nonce)
+		=> Convert.ToHexStringLower(HMACSHA256.HashData(Encoding.UTF8.GetBytes(token), Encoding.UTF8.GetBytes($"{role}:{nonce}")));
+
+	internal async Task SendAsync(JsonObject message)
+		=> await _socket.SendAsync(Encoding.UTF8.GetBytes(message.ToJsonString()), WebSocketMessageType.Text, true, Timeout());
+
+	internal async Task<JsonObject?> ReceiveAsync()
+	{
+		var buffer = new byte[64 * 1024];
+		using var stream = new MemoryStream();
+		WebSocketReceiveResult result;
+		do
+		{
+			result = await _socket.ReceiveAsync(buffer, Timeout());
+			if (result.MessageType == WebSocketMessageType.Close)
+			{
+				return null;
+			}
+
+			stream.Write(buffer, 0, result.Count);
+		}
+		while (!result.EndOfMessage);
+
+		return JsonNode.Parse(stream.ToArray()) as JsonObject;
 	}
 
 	/// <summary>Connects and runs the handshake; returns whether the plugin welcomed the window.</summary>
@@ -57,24 +85,11 @@ internal sealed class FakeVsCodeWindow : IAsyncDisposable
 		return (window, (string?)welcome?["type"] == "welcome");
 	}
 
-	internal static string Proof(string token, string role, string nonce)
-		=> Convert.ToHexStringLower(HMACSHA256.HashData(Encoding.UTF8.GetBytes(token), Encoding.UTF8.GetBytes($"{role}:{nonce}")));
-
 	internal Task SendStateAsync(JsonObject state)
 		=> SendAsync(new JsonObject { ["type"] = "state", ["state"] = state });
 
 	internal Task SendEventAsync(string name, JsonObject data)
 		=> SendAsync(new JsonObject { ["type"] = "event", ["name"] = name, ["data"] = data });
-
-	/// <summary>Waits for the plugin's next request and answers it, recording any notices on the way.</summary>
-	internal async Task<JsonObject> AnswerNextRequestAsync(JsonNode? result = null, string? error = null)
-	{
-		var request = await NextRequestAsync() ?? throw new InvalidOperationException("The plugin closed the socket.");
-		await SendAsync(error is null
-			? new JsonObject { ["type"] = "response", ["id"] = request["id"]!.GetValue<int>(), ["ok"] = true, ["result"] = result }
-			: new JsonObject { ["type"] = "response", ["id"] = request["id"]!.GetValue<int>(), ["ok"] = false, ["error"] = new JsonObject { ["message"] = error } });
-		return request;
-	}
 
 	internal Task SendPinAsync(bool pinned) => SendAsync(new JsonObject { ["type"] = "pin", ["pinned"] = pinned });
 
@@ -97,27 +112,14 @@ internal sealed class FakeVsCodeWindow : IAsyncDisposable
 		return null;
 	}
 
-	internal async Task SendAsync(JsonObject message)
-		=> await _socket.SendAsync(Encoding.UTF8.GetBytes(message.ToJsonString()), WebSocketMessageType.Text, true, Timeout());
-
-	internal async Task<JsonObject?> ReceiveAsync()
+	/// <summary>Waits for the plugin's next request and answers it, recording any notices on the way.</summary>
+	internal async Task<JsonObject> AnswerNextRequestAsync(JsonNode? result = null, string? error = null)
 	{
-		var buffer = new byte[64 * 1024];
-		using var stream = new MemoryStream();
-		WebSocketReceiveResult result;
-		do
-		{
-			result = await _socket.ReceiveAsync(buffer, Timeout());
-			if (result.MessageType == WebSocketMessageType.Close)
-			{
-				return null;
-			}
-
-			stream.Write(buffer, 0, result.Count);
-		}
-		while (!result.EndOfMessage);
-
-		return JsonNode.Parse(stream.ToArray()) as JsonObject;
+		var request = await NextRequestAsync() ?? throw new InvalidOperationException("The plugin closed the socket.");
+		await SendAsync(error is null
+			? new JsonObject { ["type"] = "response", ["id"] = request["id"]!.GetValue<int>(), ["ok"] = true, ["result"] = result }
+			: new JsonObject { ["type"] = "response", ["id"] = request["id"]!.GetValue<int>(), ["ok"] = false, ["error"] = new JsonObject { ["message"] = error } });
+		return request;
 	}
 
 	public async ValueTask DisposeAsync()
@@ -135,6 +137,4 @@ internal sealed class FakeVsCodeWindow : IAsyncDisposable
 
 		_socket.Dispose();
 	}
-
-	private static CancellationToken Timeout() => new CancellationTokenSource(TimeSpan.FromSeconds(5)).Token;
 }
