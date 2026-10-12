@@ -1,13 +1,57 @@
-# Macro Deck plugin template
+# VS Code Plugin for Macro Deck
 
-A starting point for an out-of-process Macro Deck 3 plugin: one integration with a single localized
-example action, and the developer tooling wired up. The action exists to show the shape - the manifest,
-the resource file, the executor contract - and is meant to be replaced rather than grown.
+Control Visual Studio Code from Macro Deck 3: run any editor command or workspace task from a button,
+and show the active file, Git branch, problem counts and debug state on your deck.
 
-Looking for worked examples of each capability instead? The
-[sample plugins repository](https://github.com/Macro-Deck-App/Macro-Deck-Sample-Plugins) has one
-coherent plugin per area: actions and variables, a music player, a REST API with a multi-step config
-flow, a virtual profile.
+## How it works
+
+VS Code has no API that another process can call, so the integration has two halves:
+
+```
+Macro Deck ──protocol──▶ DodecaDev.VsCode (this plugin)
+                           └─ BridgeServer: WebSocket on 127.0.0.1:51741/macro-deck-bridge
+                                 ▲            ▲
+                 Macro Deck Bridge extension, one per VS Code window (vscode-extension/)
+```
+
+- **`src/DodecaDev.VsCode`**: the Macro Deck plugin. It hosts a small loopback WebSocket hub and sends
+  actions to the *active* window (the focused one, else the one focused last).
+- **`vscode-extension/`**: the companion VS Code extension. Every window connects to the hub, pushes
+  its state (debounced), forwards events, and runs the commands and tasks it is asked to.
+  `extensionKind: ["ui"]` keeps it on the machine Macro Deck runs on, even in WSL, SSH or container
+  windows.
+
+**Pairing.** The extension generates a token (shared by all windows of a VS Code profile, kept in VS Code's
+secret storage). The user copies it with *Macro Deck: Copy Pairing Token* and pastes it into the plugin's
+setup. Neither side ever sends the token: each proves it holds it with an HMAC over the other's nonce
+(`Bridge/BridgeAuth.cs`, `vscode-extension/src/auth.ts`), the plugin first, so a window never obeys a
+process that merely took the port. Connections with an `Origin` header (browsers) are refused.
+
+### What it offers
+
+| Kind | Id | Notes |
+| --- | --- | --- |
+| Action | `run-command` | Any command id, with optional JSON arguments; dropdown lists the window's commands |
+| Action | `run-task` | Any task from the workspace (tasks.json, npm scripts, ...) |
+| Variables | `vscode_connected`, `vscode_window_count`, `vscode_workspace`, `vscode_active_file`, `vscode_language`, `vscode_git_branch`, `vscode_errors`, `vscode_warnings`, `vscode_unsaved_files`, `vscode_debugging`, `vscode_bridge_status` | From the active window |
+| Events | `file-saved`, `debug-started`, `debug-stopped`, `task-finished` | From any window |
+| Issue | `port-in-use` | Opens setup to choose another port |
+
+### Building and testing both halves
+
+```bash
+dotnet build && dotnet test                         # plugin
+(cd vscode-extension && npm install && npm test)    # extension (Node)
+dotnet test --filter TestCategory=Interop           # real TS client against the real C# server
+(cd vscode-extension && npx vsce package --out ../artifacts/)   # .vsix to install in VS Code
+```
+
+The two halves share a wire protocol (`ProtocolVersion` / `PROTOCOL_VERSION`); change both together, and
+keep the HMAC test vector in `BridgeAuthTests` and `vscode-extension/test/bridge.test.js` in step.
+
+---
+
+The rest of this file is the plugin template's guide to the Macro Deck tooling.
 
 ## Getting started
 

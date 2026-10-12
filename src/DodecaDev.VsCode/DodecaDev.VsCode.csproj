@@ -31,6 +31,10 @@
         <PackageReference Include="MacroDeck.Sdk" />
     </ItemGroup>
 
+    <ItemGroup>
+        <InternalsVisibleTo Include="DodecaDev.VsCode.Tests" />
+    </ItemGroup>
+
     <!-- The SDK reads the manifest from the content root at startup and resolves the icon path against
          that same root, so both have to land next to the built executable. -->
     <ItemGroup>

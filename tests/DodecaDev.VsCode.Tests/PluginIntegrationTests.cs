@@ -1,53 +1,223 @@
+using System.Net.WebSockets;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using DodecaDev.VsCode.Bridge;
+using MacroDeck.Plugin.Protocol.Capabilities.ConfigFlow;
+using MacroDeck.Plugin.Protocol.Capabilities.Variables;
 using MacroDeck.Plugin.Testing;
+using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 
 namespace DodecaDev.VsCode.Tests;
 
 /// <summary>
-/// Behaviour tests through <see cref="PluginTestHarness"/>: the plugin's own capability handlers run,
-/// but nothing crosses a socket. This is where you test what your integration does.
+/// Behaviour tests through <see cref="PluginTestHarness"/>, with the bridge listening on a real loopback
+/// port and <see cref="FakeVsCodeWindow"/> playing the companion extension.
 /// </summary>
 [TestFixture]
 public sealed class PluginIntegrationTests
 {
+	private const string Token = "test-pairing-token-0123456789";
+
 	private static PluginTestHarness CreateHarness() =>
-		PluginTestHarness.Create(builder => builder
-			.UseLocalization(Strings.LocalizationCatalog)
-			.RegisterIntegration<PluginIntegration>());
+		PluginTestHarness.Create(builder =>
+		{
+			builder
+				.UseLocalization(Strings.LocalizationCatalog)
+				.RegisterIntegration<PluginIntegration>();
+			builder.Services.AddSingleton<BridgeServer>();
+		});
 
-	[Test]
-	public async Task The_plugin_builds_and_initializes()
+	private static async Task<(PluginTestHarness Harness, int Port)> PairedHarnessAsync()
 	{
-		await using var harness = CreateHarness();
+		var port = FakeVsCodeWindow.FreePort();
+		var harness = CreateHarness();
+		var entryId = harness.Context.Config.AddEntry("VS Code");
+		harness.Context.Config.SeedSecret(entryId, "pairing_token", Token);
+		harness.Context.Config.SeedString(entryId, "port", port.ToString(System.Globalization.CultureInfo.InvariantCulture));
+		await harness.InitializeIntegrationsAsync();
+		return (harness, port);
+	}
 
-		Assert.DoesNotThrowAsync(harness.InitializeIntegrationsAsync);
+	private static ConfigFlowOAuthContextDto OAuth() => new() { RedirectUri = "http://localhost/callback", State = "state-1" };
+
+	private static async Task<VariableReadingDto> ReadAsync(PluginTestHarness harness, string id)
+		=> (await harness.Variables.GetAsync(id)).DataAs<VariableReadingDto>()!;
+
+	/// <summary>A window's messages are handled in order, so once a request it answers after a state report
+	/// completes, that report has been applied.</summary>
+	private static async Task RoundTripAsync(PluginTestHarness harness, FakeVsCodeWindow window)
+	{
+		var execution = harness.Actions.ExecuteAsync("run-command",
+			new Dictionary<string, object?> { ["command"] = "noop" });
+		await window.AnswerNextRequestAsync();
+		await execution;
 	}
 
 	[Test]
-	public async Task The_example_action_writes_the_message_to_the_log()
+	public async Task Without_a_window_commands_fail_as_not_connected()
 	{
 		await using var harness = CreateHarness();
 		await harness.InitializeIntegrationsAsync();
 
-		var outcome = await harness.Actions.ExecuteAsync(
-			"log-message",
-			new Dictionary<string, object?> { ["message"] = "Hello from a test" });
-
-		Assert.That(outcome.Succeeded, Is.True);
-		Assert.That(harness.Logs.Events.Any(e => e.Message.Contains("Hello from a test")), Is.True);
-	}
-
-	[Test]
-	public async Task The_example_action_fails_when_the_message_is_blank()
-	{
-		await using var harness = CreateHarness();
-		await harness.InitializeIntegrationsAsync();
-
-		var outcome = await harness.Actions.ExecuteAsync(
-			"log-message",
-			new Dictionary<string, object?> { ["message"] = "   " });
+		var outcome = await harness.Actions.ExecuteAsync("run-command",
+			new Dictionary<string, object?> { ["command"] = "workbench.action.files.save" });
 
 		Assert.That(outcome.Succeeded, Is.False);
+		Assert.That((await ReadAsync(harness, "connected")).Value.Boolean, Is.False);
+	}
+
+	[Test]
+	public async Task The_bridge_status_says_whether_setup_is_missing_or_the_bridge_is_listening()
+	{
+		await using var unconfigured = CreateHarness();
+		await unconfigured.InitializeIntegrationsAsync();
+		var (paired, _) = await PairedHarnessAsync();
+		await using var _ = paired;
+
+		Assert.That((await ReadAsync(unconfigured, "bridge-status")).Value.Text, Is.EqualTo("not-configured"));
+		Assert.That((await ReadAsync(paired, "bridge-status")).Value.Text, Is.EqualTo("listening"));
+	}
+
+	[Test]
+	public async Task A_paired_window_reports_its_state_as_variables()
+	{
+		var (harness, port) = await PairedHarnessAsync();
+		await using var _ = harness;
+		var (window, welcomed) = await FakeVsCodeWindow.ConnectAsync(port, Token);
+		await using var __ = window;
+
+		await window.SendStateAsync(new JsonObject
+		{
+			["focused"] = true, ["workspace"] = "MacroDeck3", ["gitBranch"] = "main", ["errors"] = 3
+		});
+		await RoundTripAsync(harness, window);
+
+		Assert.That(welcomed, Is.True);
+		Assert.That((await ReadAsync(harness, "connected")).Value.Boolean, Is.True);
+		Assert.That((await ReadAsync(harness, "git-branch")).Value.Text, Is.EqualTo("main"));
+		Assert.That((await ReadAsync(harness, "workspace")).Value.Text, Is.EqualTo("MacroDeck3"));
+	}
+
+	[Test]
+	public async Task Run_command_sends_the_command_and_spreads_a_json_array_of_arguments()
+	{
+		var (harness, port) = await PairedHarnessAsync();
+		await using var _ = harness;
+		var (window, _) = await FakeVsCodeWindow.ConnectAsync(port, Token);
+		await using var __ = window;
+
+		var execution = harness.Actions.ExecuteAsync("run-command", new Dictionary<string, object?>
+		{
+			["command"] = "workbench.action.tasks.runTask",
+			["arguments"] = "[\"build\"]"
+		});
+		var request = await window.AnswerNextRequestAsync();
+		var outcome = await execution;
+
+		Assert.That(outcome.Succeeded, Is.True);
+		Assert.That((string?)request["method"], Is.EqualTo("executeCommand"));
+		Assert.That((string?)request["params"]!["command"], Is.EqualTo("workbench.action.tasks.runTask"));
+		Assert.That(request["params"]!["args"]!.ToJsonString(), Is.EqualTo("[\"build\"]"));
+	}
+
+	[Test]
+	public async Task A_command_VS_Code_rejects_fails_the_action()
+	{
+		var (harness, port) = await PairedHarnessAsync();
+		await using var _ = harness;
+		var (window, _) = await FakeVsCodeWindow.ConnectAsync(port, Token);
+		await using var __ = window;
+
+		var execution = harness.Actions.ExecuteAsync("run-command",
+			new Dictionary<string, object?> { ["command"] = "no.such.command" });
+		await window.AnswerNextRequestAsync(error: "command 'no.such.command' not found");
+
+		Assert.That((await execution).Succeeded, Is.False);
+	}
+
+	[Test]
+	public async Task Invalid_json_arguments_fail_before_anything_is_sent()
+	{
+		var (harness, port) = await PairedHarnessAsync();
+		await using var _ = harness;
+		var (window, _) = await FakeVsCodeWindow.ConnectAsync(port, Token);
+		await using var __ = window;
+
+		var outcome = await harness.Actions.ExecuteAsync("run-command", new Dictionary<string, object?>
+		{
+			["command"] = "editor.action.formatDocument",
+			["arguments"] = "{not json"
+		});
+
+		Assert.That(outcome.Succeeded, Is.False);
+	}
+
+	[Test]
+	public async Task A_window_with_the_wrong_token_is_refused()
+	{
+		var (harness, port) = await PairedHarnessAsync();
+		await using var _ = harness;
+
+		var (window, welcomed) = await FakeVsCodeWindow.ConnectAsync(port, "some-other-token-0123456789");
+		await using var __ = window;
+
+		// The plugin proves itself first, so the window already knows the token is wrong.
+		Assert.That(welcomed, Is.False);
+		Assert.That((await ReadAsync(harness, "connected")).Value.Boolean, Is.False);
+	}
+
+	[Test]
+	public async Task A_browser_connection_is_refused()
+	{
+		var (harness, port) = await PairedHarnessAsync();
+		await using var _ = harness;
+
+		Assert.ThrowsAsync<WebSocketException>(() => FakeVsCodeWindow.ConnectAsync(port, Token,
+			configure: o => o.SetRequestHeader("Origin", "https://example.com")));
+	}
+
+	[Test]
+	public async Task Window_events_are_published_with_their_declared_payload()
+	{
+		var (harness, port) = await PairedHarnessAsync();
+		await using var _ = harness;
+		var (window, _) = await FakeVsCodeWindow.ConnectAsync(port, Token);
+		await using var __ = window;
+
+		await window.SendEventAsync("task-finished", new JsonObject { ["task"] = "build", ["exitCode"] = 1, ["extra"] = "dropped" });
+		await window.SendEventAsync("not-declared", new JsonObject());
+		await Wait.UntilAsync(() => harness.Context.Events.Published.Count > 0, because: "the event should be forwarded");
+
+		var published = harness.Context.Events.Published.Single();
+		var payload = published.Parameters!.Value;
+		Assert.That(published.EventId, Is.EqualTo("task-finished"));
+		Assert.That(payload.GetProperty("task").GetString(), Is.EqualTo("build"));
+		Assert.That(payload.GetProperty("exitCode").GetDouble(), Is.EqualTo(1));
+		Assert.That(payload.TryGetProperty("extra", out JsonElement _), Is.False);
+	}
+
+	[Test]
+	public async Task Setup_refuses_a_port_out_of_range()
+	{
+		await using var harness = CreateHarness();
+		await harness.InitializeIntegrationsAsync();
+
+		await harness.ConfigFlow.StartAsync(new FlowStartArguments { SessionId = "setup", OAuth = OAuth() });
+		var result = (await harness.ConfigFlow.SubmitAsync(new FlowSubmitArguments
+		{
+			SessionId = "setup",
+			StepId = "pairing",
+			OAuth = OAuth(),
+			Input = new Dictionary<string, JsonElement>
+			{
+				["pairing_token"] = JsonSerializer.SerializeToElement(Token),
+				["port"] = JsonSerializer.SerializeToElement(80)
+			}
+		})).DataAs<ConfigFlowResultDto>();
+
+		Assert.That(result!.Kind, Is.EqualTo("Error"));
+		Assert.That(result.FieldErrors, Does.ContainKey("port"));
 	}
 }
 
@@ -74,7 +244,7 @@ public sealed class LocalizationTests
 	[Test]
 	public void The_action_strings_come_from_the_catalog()
 	{
-		Assert.That(Strings.LocalizationCatalog.KeysOf("en"), Does.Contain("Actions.LogMessage.Name"));
+		Assert.That(Strings.LocalizationCatalog.KeysOf("en"), Does.Contain("Actions.RunCommand.Name"));
 	}
 
 	[Test]

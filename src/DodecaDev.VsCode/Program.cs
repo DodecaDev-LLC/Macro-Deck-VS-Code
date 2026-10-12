@@ -1,14 +1,18 @@
+using DodecaDev.VsCode;
+using DodecaDev.VsCode.Bridge;
 using MacroDeck.Plugin.Hosting;
 using MacroDeck.Plugin.Serilog;
-using DodecaDev.VsCode;
+using Microsoft.Extensions.DependencyInjection;
 
 // Identity, description and icon are not set here: they come from manifest.json at the content root.
-// Strings is generated from Localization/*.resx, so UseLocalization is what makes every LocalizedString
-// below resolve in the user's language rather than falling back to its key.
-var plugin = MacroDeckPlugin.CreatePlugin(args)
+var builder = MacroDeckPlugin.CreatePlugin(args)
 	.UseMacroDeckLogging()
 	.UseLocalization(Strings.LocalizationCatalog)
-	.RegisterIntegration<PluginIntegration>()
-	.Build();
+	.RegisterIntegration<PluginIntegration>();
 
+// One hub for the whole process: it outlives integration re-initialization, which only restarts it
+// when the port or pairing token changed.
+builder.Services.AddSingleton<BridgeServer>();
+
+var plugin = builder.Build();
 await plugin.RunAsync();

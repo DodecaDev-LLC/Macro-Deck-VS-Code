@@ -1,0 +1,85 @@
+{
+  "name": "macro-deck-bridge",
+  "displayName": "Macro Deck Bridge",
+  "description": "Connects VS Code to the VS Code Plugin for Macro Deck: run commands and tasks from your deck, and show the active file, Git branch and problem counts on its buttons.",
+  "version": "1.0.0",
+  "publisher": "dodecadev",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DodecaDev-LLC/Macro-Deck-VS-Code"
+  },
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "macro deck",
+    "stream deck",
+    "macro",
+    "shortcuts"
+  ],
+  "extensionKind": [
+    "ui"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "macroDeckBridge.copyPairingToken",
+        "title": "Copy Pairing Token",
+        "category": "Macro Deck"
+      },
+      {
+        "command": "macroDeckBridge.resetPairingToken",
+        "title": "Reset Pairing Token",
+        "category": "Macro Deck"
+      },
+      {
+        "command": "macroDeckBridge.reconnect",
+        "title": "Reconnect",
+        "category": "Macro Deck"
+      }
+    ],
+    "configuration": {
+      "title": "Macro Deck Bridge",
+      "properties": {
+        "macroDeckBridge.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Connect this VS Code to Macro Deck."
+        },
+        "macroDeckBridge.port": {
+          "type": "integer",
+          "default": 51741,
+          "minimum": 1024,
+          "maximum": 65535,
+          "description": "The local port of the VS Code Plugin in Macro Deck. Must match the port in the plugin's setup."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "build": "esbuild src/extension.ts --bundle --platform=node --format=cjs --target=node20 --external:vscode --external:bufferutil --external:utf-8-validate --outfile=dist/extension.js",
+    "vscode:prepublish": "npm run check && npm run build -- --minify",
+    "test": "esbuild src/auth.ts src/bridgeClient.ts src/gitHead.ts --bundle --platform=node --format=cjs --target=node20 --external:bufferutil --external:utf-8-validate --outdir=out && node --test test/*.test.js",
+    "package": "vsce package"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "~1.95.0",
+    "@types/ws": "^8.18.0",
+    "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.6.0"
+  }
+}

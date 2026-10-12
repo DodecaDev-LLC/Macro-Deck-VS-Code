@@ -36,5 +36,20 @@
   "repository": "https://github.com/DodecaDev-LLC/Macro-Deck-VS-Code",
   "compatibility": {
     "macroDeck": ">=3.0.0-0"
+  },
+  "additionalLinks": [
+    {
+      "type": "issues",
+      "url": "https://github.com/DodecaDev-LLC/Macro-Deck-VS-Code/issues"
+    }
+  ],
+  "permissions": [
+    "host:config",
+    "events:publish"
+  ],
+  "ai": {
+    "interaction": false,
+    "generatedContent": false,
+    "generatedAssets": true
   }
 }
