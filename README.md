@@ -83,6 +83,13 @@ keep the HMAC test vector in `BridgeAuthTests` and `vscode-extension/test/bridge
 
 Publishing a GitHub release (tag `v1.2.3`) does both halves at once: the plugin goes to the Creator
 Portal for review, and the matching `macro-deck-bridge-1.2.3.vsix` is attached to the release.
+The same release publishes that `.vsix` to the VS Code Marketplace under the `dodecadev` publisher.
+
+Marketplace publishing signs in to Azure as the managed identity `id-vsce-publisher` with GitHub's OIDC
+token: no secret is stored. Its federated credential trusts only jobs in this repository's `marketplace`
+environment, which only `main` and `v*` tags may use. The identity's IDs are the repository variables
+`AZURE_CLIENT_ID`, `AZURE_TENANT_ID` and `AZURE_SUBSCRIPTION_ID`. To publish an existing release again,
+run the *VS Code extension* workflow by hand with `publish_tag` set to its tag.
 
 ## Icon
 

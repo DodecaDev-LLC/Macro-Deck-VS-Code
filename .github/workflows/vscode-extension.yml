@@ -2,7 +2,16 @@
 #
 # - Pull requests and merges to main: the .vsix is a workflow artifact.
 # - A published GitHub release: the .vsix takes its version from the release tag (v1.2.3 or 1.2.3) and
-#   is attached to the release, so the plugin and the extension of one release share a version.
+#   is attached to the release, so the plugin and the extension of one release share a version, and it
+#   is published to the VS Code Marketplace.
+# - Run manually ("Run workflow"):
+#   - show_marketplace_identity: prints the ID to add as a member of the dodecadev publisher. Needed once.
+#   - publish_tag: publishes the .vsix already attached to that release, e.g. v1.0.0.
+#
+# Marketplace publishing signs in to Azure as the managed identity id-vsce-publisher through GitHub's
+# OIDC token; nothing secret is stored here. The identity trusts only jobs in the "marketplace"
+# environment, which only main and v* tags may use. AZURE_CLIENT_ID, AZURE_TENANT_ID and
+# AZURE_SUBSCRIPTION_ID are repository variables.
 #
 # One .vsix serves every platform: the extension is a single bundled JavaScript file with no native code.
 name: VS Code extension
@@ -16,6 +25,15 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      show_marketplace_identity:
+        description: Print the ID to add as a member of the Marketplace publisher (one-time setup)
+        type: boolean
+        default: false
+      publish_tag:
+        description: Publish the .vsix attached to this release to the Marketplace, e.g. v1.0.0
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -85,3 +103,70 @@ jobs:
           TAG: ${{ github.event.release.tag_name }}
           VSIX: ${{ needs.build.outputs.vsix }}
         run: gh release upload "$TAG" "$VSIX" --clobber --repo "$GITHUB_REPOSITORY"
+
+  # One-time setup: the Marketplace adds a member by its Azure DevOps profile ID, which only the identity
+  # itself can look up.
+  marketplace-identity:
+    if: github.event_name == 'workflow_dispatch' && inputs.show_marketplace_identity
+    runs-on: ubuntu-latest
+    environment: marketplace
+    permissions:
+      id-token: write
+    steps:
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Look up the identity's Marketplace profile
+        # 499b84ac-… is Azure DevOps, which hosts the Marketplace's publisher accounts.
+        run: |
+          id=$(az rest -u https://app.vssps.visualstudio.com/_apis/profile/profiles/me \
+            --resource 499b84ac-1321-427f-aa17-267ca6975798 --query id -o tsv)
+          echo "Add this ID as a Contributor member of the dodecadev publisher: $id"
+          echo "Add \`$id\` as a **Contributor** member of the \`dodecadev\` publisher." >> "$GITHUB_STEP_SUMMARY"
+
+  publish-marketplace:
+    if: >-
+      github.event_name == 'release' ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish_tag != '')
+    needs: build
+    runs-on: ubuntu-latest
+    environment: marketplace
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Take the .vsix from this run's build
+        if: github.event_name == 'release'
+        uses: actions/download-artifact@v7
+        with:
+          name: vsix
+
+      - name: Take the .vsix from the release
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.publish_tag }}
+        run: |
+          if ! [[ "$TAG" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::'$TAG' is not a release tag like v1.2.3."
+            exit 1
+          fi
+          gh release download "$TAG" --pattern 'macro-deck-bridge-*.vsix' --repo "$GITHUB_REPOSITORY"
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Publish to the VS Code Marketplace
+        run: |
+          vsix=$(ls macro-deck-bridge-*.vsix)
+          npx --yes @vscode/vsce@3.9.2 publish --azure-credential --packagePath "$vsix"
