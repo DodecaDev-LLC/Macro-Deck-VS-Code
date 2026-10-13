@@ -104,8 +104,9 @@ jobs:
           VSIX: ${{ needs.build.outputs.vsix }}
         run: gh release upload "$TAG" "$VSIX" --clobber --repo "$GITHUB_REPOSITORY"
 
-  # One-time setup: the Marketplace adds a member by its Azure DevOps profile ID, which only the identity
-  # itself can look up.
+  # One-time setup: the Marketplace adds a member by its Azure DevOps identity ID, which only the identity
+  # itself can look up. A managed identity has no Azure DevOps profile (profiles/me answers VSS011031),
+  # so the ID comes from connectionData's authenticatedUser instead.
   marketplace-identity:
     if: github.event_name == 'workflow_dispatch' && inputs.show_marketplace_identity
     runs-on: ubuntu-latest
@@ -119,11 +120,15 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Look up the identity's Marketplace profile
+      - name: Look up the identity's Azure DevOps ID
         # 499b84ac-… is Azure DevOps, which hosts the Marketplace's publisher accounts.
         run: |
-          id=$(az rest -u https://app.vssps.visualstudio.com/_apis/profile/profiles/me \
-            --resource 499b84ac-1321-427f-aa17-267ca6975798 --query id -o tsv)
+          id=$(az rest -u https://app.vssps.visualstudio.com/_apis/connectionData \
+            --resource 499b84ac-1321-427f-aa17-267ca6975798 --query authenticatedUser.id -o tsv)
+          if [ -z "$id" ]; then
+            echo "::error::Azure DevOps returned no identity ID for the managed identity."
+            exit 1
+          fi
           echo "Add this ID as a Contributor member of the dodecadev publisher: $id"
           echo "Add \`$id\` as a **Contributor** member of the \`dodecadev\` publisher." >> "$GITHUB_STEP_SUMMARY"
 
