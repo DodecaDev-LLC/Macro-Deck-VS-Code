@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+	<!-- A macro pad whose four keys are what the plugin does: run a VS Code command (the blue code key),
+	     run a task, choose the window, and a spare key. No Macro Deck or VS Code logo. -->
+	<rect width="128" height="128" rx="26" fill="#1E1E1E" />
+	<rect x="2" y="2" width="124" height="124" rx="24" fill="none" stroke="#333333" stroke-width="2" />
+
+	<!-- Run a command: </> -->
+	<rect x="14" y="14" width="46" height="46" rx="9" fill="#0078D4" />
+	<g fill="none" stroke="#FFFFFF" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
+		<path d="M29 29 L21 37 L29 45" />
+		<path d="M45 29 L53 37 L45 45" />
+		<path d="M40 27 L34 47" />
+	</g>
+
+	<!-- Run a task: play -->
+	<rect x="68" y="14" width="46" height="46" rx="9" fill="#3A3D41" />
+	<path d="M85 27 L101 37 L85 47 Z" fill="#CCCCCC" stroke="#CCCCCC" stroke-width="2" stroke-linejoin="round" />
+
+	<!-- Choose the window: a window frame with its title bar -->
+	<rect x="14" y="68" width="46" height="46" rx="9" fill="#3A3D41" />
+	<rect x="24" y="80" width="26" height="22" rx="3" fill="none" stroke="#CCCCCC" stroke-width="3.5" />
+	<path d="M24 87 H50" stroke="#CCCCCC" stroke-width="3.5" />
+
+	<!-- Spare key -->
+	<rect x="68" y="68" width="46" height="46" rx="9" fill="#2D2F33" />
+</svg>

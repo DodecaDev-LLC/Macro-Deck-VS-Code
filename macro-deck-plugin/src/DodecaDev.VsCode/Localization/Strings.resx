@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!-- The default-language file. Every translation is checked against it and the fallback chain ends
+       here, so it is required even for a plugin that ships one language. Add a language by adding
+       Localization/Strings.<culture>.resx beside it (Strings.de.resx, Strings.pt-BR.resx).
+       A dotted key becomes a nested class: Actions.LogMessage.Name is Strings.Actions.LogMessage.Name(). -->
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Actions.RunCommand.Name" xml:space="preserve">
+    <value>Run VS Code command</value>
+  </data>
+  <data name="Actions.RunCommand.Description" xml:space="preserve">
+    <value>Runs any command in the active VS Code window, including commands added by extensions.</value>
+  </data>
+  <data name="Actions.RunCommand.Command.Label" xml:space="preserve">
+    <value>Command</value>
+  </data>
+  <data name="Actions.RunCommand.Command.Description" xml:space="preserve">
+    <value>Pick a command from the active window, or type a command id such as workbench.action.toggleZenMode.</value>
+  </data>
+  <data name="Actions.RunCommand.Arguments.Label" xml:space="preserve">
+    <value>Arguments (JSON)</value>
+  </data>
+  <data name="Actions.RunCommand.Arguments.Description" xml:space="preserve">
+    <value>Optional. A JSON array is passed as the command's arguments in order; any other JSON value is passed as its only argument.</value>
+  </data>
+  <data name="Actions.RunCommand.Arguments.Placeholder" xml:space="preserve">
+    <value>["argument"]</value>
+  </data>
+  <data name="Actions.RunTask.Name" xml:space="preserve">
+    <value>Run VS Code task</value>
+  </data>
+  <data name="Actions.RunTask.Description" xml:space="preserve">
+    <value>Runs a task from the active VS Code window's workspace, such as a build or test task.</value>
+  </data>
+  <data name="Actions.RunTask.Task.Label" xml:space="preserve">
+    <value>Task</value>
+  </data>
+  <data name="Actions.RunTask.Task.Description" xml:space="preserve">
+    <value>Pick a task from the active window's workspace, or type its name.</value>
+  </data>
+  <data name="Errors.NoWindow" xml:space="preserve">
+    <value>No VS Code window is connected. Open VS Code with the Macro Deck Bridge extension and check that its pairing token matches.</value>
+  </data>
+  <data name="Errors.Disconnected" xml:space="preserve">
+    <value>The VS Code window disconnected before it answered.</value>
+  </data>
+  <data name="Errors.Timeout" xml:space="preserve">
+    <value>VS Code did not answer in time.</value>
+  </data>
+  <data name="Errors.Rejected" xml:space="preserve">
+    <value>VS Code could not do that: {detail}</value>
+    <comment>[detail:string] The error text VS Code reported, in VS Code's language.</comment>
+  </data>
+  <data name="Errors.InvalidArguments" xml:space="preserve">
+    <value>The arguments are not valid JSON.</value>
+  </data>
+  <data name="ConfigFlow.Title" xml:space="preserve">
+    <value>Pair with VS Code</value>
+  </data>
+  <data name="ConfigFlow.Description" xml:space="preserve">
+    <value>In VS Code, install the Macro Deck Bridge extension, run "Macro Deck: Copy Pairing Token" from the Command Palette, and paste the token here. Every VS Code window on this computer then connects automatically.</value>
+  </data>
+  <data name="ConfigFlow.UnknownStep" xml:space="preserve">
+    <value>This setup step is not known. Start the setup again.</value>
+  </data>
+  <data name="ConfigFlow.Token.Label" xml:space="preserve">
+    <value>Pairing token</value>
+  </data>
+  <data name="ConfigFlow.Token.Description" xml:space="preserve">
+    <value>The token VS Code copied to the clipboard. It lets VS Code and Macro Deck recognize each other; it is never sent over the connection.</value>
+  </data>
+  <data name="ConfigFlow.Token.Invalid" xml:space="preserve">
+    <value>Paste the whole pairing token from VS Code.</value>
+  </data>
+  <data name="ConfigFlow.Port.Label" xml:space="preserve">
+    <value>Port</value>
+  </data>
+  <data name="ConfigFlow.Port.Description" xml:space="preserve">
+    <value>The local port VS Code connects to. Change it only if another program uses it, and set the same port in VS Code's "Macro Deck Bridge: Port" setting.</value>
+  </data>
+  <data name="ConfigFlow.Port.Invalid" xml:space="preserve">
+    <value>Enter a port between 1024 and 65535.</value>
+  </data>
+  <data name="Variables.BridgeStatus" xml:space="preserve">
+    <value>Bridge status</value>
+  </data>
+  <data name="Variables.Connected" xml:space="preserve">
+    <value>VS Code connected</value>
+  </data>
+  <data name="Variables.WindowCount" xml:space="preserve">
+    <value>VS Code windows</value>
+  </data>
+  <data name="Variables.Workspace" xml:space="preserve">
+    <value>Workspace</value>
+  </data>
+  <data name="Variables.ActiveFile" xml:space="preserve">
+    <value>Active file</value>
+  </data>
+  <data name="Variables.Language" xml:space="preserve">
+    <value>Language</value>
+  </data>
+  <data name="Variables.GitBranch" xml:space="preserve">
+    <value>Git branch</value>
+  </data>
+  <data name="Variables.Errors" xml:space="preserve">
+    <value>Errors</value>
+  </data>
+  <data name="Variables.Warnings" xml:space="preserve">
+    <value>Warnings</value>
+  </data>
+  <data name="Variables.UnsavedFiles" xml:space="preserve">
+    <value>Unsaved files</value>
+  </data>
+  <data name="Variables.Debugging" xml:space="preserve">
+    <value>Debugging</value>
+  </data>
+  <data name="Events.FileSaved.Name" xml:space="preserve">
+    <value>File saved</value>
+  </data>
+  <data name="Events.FileSaved.Description" xml:space="preserve">
+    <value>A file was saved in any connected VS Code window.</value>
+  </data>
+  <data name="Events.FileSaved.FileName" xml:space="preserve">
+    <value>File name</value>
+  </data>
+  <data name="Events.FileSaved.Language" xml:space="preserve">
+    <value>Language</value>
+  </data>
+  <data name="Events.SessionName" xml:space="preserve">
+    <value>Debug session</value>
+  </data>
+  <data name="Events.DebugStarted.Name" xml:space="preserve">
+    <value>Debugging started</value>
+  </data>
+  <data name="Events.DebugStarted.Description" xml:space="preserve">
+    <value>A debug session started in a connected VS Code window.</value>
+  </data>
+  <data name="Events.DebugStopped.Name" xml:space="preserve">
+    <value>Debugging stopped</value>
+  </data>
+  <data name="Events.DebugStopped.Description" xml:space="preserve">
+    <value>A debug session ended in a connected VS Code window.</value>
+  </data>
+  <data name="Events.TaskFinished.Name" xml:space="preserve">
+    <value>Task finished</value>
+  </data>
+  <data name="Events.TaskFinished.Description" xml:space="preserve">
+    <value>A task ended in a connected VS Code window.</value>
+  </data>
+  <data name="Events.TaskFinished.Task" xml:space="preserve">
+    <value>Task</value>
+  </data>
+  <data name="Events.TaskFinished.AnyTask" xml:space="preserve">
+    <value>Any task</value>
+  </data>
+  <data name="Events.TaskFinished.ExitCode" xml:space="preserve">
+    <value>Exit code</value>
+  </data>
+  <data name="Issues.PortInUse.Title" xml:space="preserve">
+    <value>The bridge port is in use</value>
+  </data>
+  <data name="Issues.PortInUse.Description" xml:space="preserve">
+    <value>Another program is using port {port}, so VS Code cannot connect. Choose a different port in setup and set the same port in VS Code.</value>
+    <comment>[port:string] A TCP port number.</comment>
+  </data>
+  <data name="Issues.OpenSetup" xml:space="preserve">
+    <value>Open setup</value>
+  </data>
+  <data name="Issues.Unknown" xml:space="preserve">
+    <value>This issue is no longer known.</value>
+  </data>
+  <data name="Actions.Window.Label" xml:space="preserve">
+    <value>Window</value>
+  </data>
+  <data name="Actions.Window.Description" xml:space="preserve">
+    <value>Which VS Code window this button controls. Leave empty for the active window: the pinned one, else the one you used last. Pick a workspace to always control that project, or All windows.</value>
+  </data>
+  <data name="Actions.Window.DescriptionSingle" xml:space="preserve">
+    <value>The workspace to pin. Leave empty to pin the window you are using.</value>
+  </data>
+  <data name="Actions.Window.Placeholder" xml:space="preserve">
+    <value>Active window</value>
+  </data>
+  <data name="Actions.Window.Active" xml:space="preserve">
+    <value>Active window</value>
+  </data>
+  <data name="Actions.Window.All" xml:space="preserve">
+    <value>All windows</value>
+  </data>
+  <data name="Actions.Window.NoFolder" xml:space="preserve">
+    <value>Window without a folder</value>
+  </data>
+  <data name="Actions.SelectWindow.Name" xml:space="preserve">
+    <value>Select VS Code window</value>
+  </data>
+  <data name="Actions.SelectWindow.Description" xml:space="preserve">
+    <value>Chooses which VS Code window the other buttons control: pin the window you are using, switch to the next one, or go back to following the window you use.</value>
+  </data>
+  <data name="Actions.SelectWindow.Mode.Label" xml:space="preserve">
+    <value>What to do</value>
+  </data>
+  <data name="Actions.SelectWindow.Modes.Toggle" xml:space="preserve">
+    <value>Pin or unpin the current window</value>
+  </data>
+  <data name="Actions.SelectWindow.Modes.Next" xml:space="preserve">
+    <value>Switch to the next window</value>
+  </data>
+  <data name="Actions.SelectWindow.Modes.Pin" xml:space="preserve">
+    <value>Pin a workspace</value>
+  </data>
+  <data name="Actions.SelectWindow.Modes.Unpin" xml:space="preserve">
+    <value>Follow the window I use</value>
+  </data>
+  <data name="Actions.SelectWindow.States.Pinned" xml:space="preserve">
+    <value>Pinned</value>
+  </data>
+  <data name="Actions.SelectWindow.States.Following" xml:space="preserve">
+    <value>Following</value>
+  </data>
+  <data name="Variables.TargetPinned" xml:space="preserve">
+    <value>Window pinned</value>
+  </data>
+  <data name="Errors.WorkspaceNotOpen" xml:space="preserve">
+    <value>"{workspace}" is not open in VS Code.</value>
+    <comment>[workspace:string] A VS Code workspace or folder name.</comment>
+  </data>
+</root>
